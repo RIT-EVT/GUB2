@@ -1,0 +1,31 @@
+Current tasks
+[√] setup simple project and install toolchain
+[√] get UART logging working
+[] get CANbus through MCP251863 to UART working
+[] get SD card file writing with raw CAN message dumps
+[] get wifi ap working - maybe wifi station + AP
+[] simple http server for listing and reading sd card contents
+[] generate vectorblf files for CAN logs
+
+Hardware
+    SPI2 for SD
+        
+    SPI3 for CAN
+        
+    UART0 debug 
+    
+    
+
+
+Key examples:
+    network > simple_sniffer
+        wifi AP
+        SD card
+        console
+        
+    storage > sd_card
+        SD card
+        
+    protocols > http_server > file serving
+        SD card
+        http file server
