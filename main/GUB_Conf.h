@@ -1,0 +1,7 @@
+#define CANSPI_HOST SPI3_HOST
+#define PIN_NUM_CAN_MISO 37
+#define PIN_NUM_CAN_MOSI 35
+#define PIN_NUM_CAN_CLK  36
+#define PIN_NUM_CAN_CS   45
+
+#define MCP251863_CRYCLK    (40000000)
