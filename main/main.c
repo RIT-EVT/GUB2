@@ -6,91 +6,78 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
-#include "led_strip.h"
+
 #include "MCP251XFD.h"
 
-#include "GUB_Conf.h"
+#include "GUB2.h"
 #include "Driver_MCP251863.h"
 
-#define PIN_NUM_HEARTBEAT 48
-
 static const char *TAG = "GUB2";
-
-static led_strip_handle_t led_strip;
-static uint8_t s_led_state = 0;
 
 MCP251XFD_BitTimeStats MCP251863_BTStats;
 uint32_t MCP251863_SYSCLK1;
 
-static void toggleLED(void){
-    #if PIN_NUM_HEARTBEAT==48
-    /* If the addressable LED is enabled */
-    if (s_led_state) {
-        /* Set the LED pixel using RGB from 0 (0%) to 255 (100%) for each color */
-        led_strip_set_pixel(led_strip, 0, 0, 16, 0);
-        /* Refresh the strip to send data */
-        led_strip_refresh(led_strip);
-    } else {
-        /* Set all LED off to clear all pixels */
-        led_strip_clear(led_strip);
-    }
-    #else
+// void sendMessages(spi_device_handle_t spi, uint8_t data){
+//     ESP_LOGD("SPI3", "Preparing to send byte");
+//     spi_device_acquire_bus(spi, portMAX_DELAY);
+//     spi_transaction_t t;
+//     memset(&t, 0 , sizeof(t));
+//     t.length = 8;
+//     t.tx_buffer = &data;
+//     t.user = (void*) 1;
+//     ESP_LOGD("SPI3", "Transmitting");
+//     assert(spi_device_polling_transmit(spi, &t) == ESP_OK);
 
-    gpio_set_level(PIN_NUM_HEARTBEAT, s_led_state);
-    #endif
-}
-
-static void initLED(void){
-    #if PIN_NUM_HEARTBEAT==48
-    ESP_LOGD(TAG, "Heartbeat with RGB");
-    led_strip_config_t strip_config = {
-        .strip_gpio_num = PIN_NUM_HEARTBEAT,
-        .max_leds = 1, // at least one LED on board
-    };
-    led_strip_rmt_config_t rmt_config = {
-        .resolution_hz = 10 * 1000 * 1000, // 10MHz
-    };
-    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
-    /* Set all LED off to clear all pixels */
-    led_strip_clear(led_strip);
-
-    #else
-    ESP_LOGD(TAG, "Heartbeat with GPIO");
-    gpio_reset_pin(PIN_NUM_HEARTBEAT);
-    /* Set the GPIO as a push/pull output */
-    gpio_set_direction(PIN_NUM_HEARTBEAT, GPIO_MODE_OUTPUT);
-    #endif
-}
-
-
-
-void sendMessages(spi_device_handle_t spi, uint8_t data){
-    ESP_LOGD("SPI3", "Preparing to send byte");
-    spi_device_acquire_bus(spi, portMAX_DELAY);
-    spi_transaction_t t;
-    memset(&t, 0 , sizeof(t));
-    t.length = 8;
-    t.tx_buffer = &data;
-    t.user = (void*) 1;
-    ESP_LOGD("SPI3", "Transmitting");
-    assert(spi_device_polling_transmit(spi, &t) == ESP_OK);
-
-    spi_device_release_bus(spi);
-}
+//     spi_device_release_bus(spi);
+// }
 
 void printCANMessage(MCP251XFD_CANMessage *msg){
-    printf(LOG_COLOR(LOG_COLOR_BROWN)"Message #%"PRIu32" ID: 0x%08" PRIx32 " with %d bytes of data: ", msg->MessageSEQ, msg->MessageID, msg->DLC);
+    printf(LOG_COLOR(LOG_COLOR_PURPLE)"Message #%"PRIu32" ID: 0x%08" PRIx32 " with %d bytes of data: ", msg->MessageSEQ, msg->MessageID, msg->DLC);
     for(int i=0; i<msg->DLC; i++){
-        printf("0x%x ", msg->PayloadData[i]);
+        printf("0x%X ", msg->PayloadData[i]);
     }
     printf("\n"LOG_RESET_COLOR);
 }
 
+MCPError MCP251863DeviceSetup(MCP251XFD *dev, MCP251XFD_Config *conf, MCP251XFD_FIFO *fifoConf, uint8_t fifoCount){
+    if (dev == NULL) return ERR__CONFIGURATION;
+    if (conf == NULL) return ERR__CONFIGURATION;
+    if (fifoConf == NULL) return ERR__CONFIGURATION;
+    if (fifoCount == 0) return ERR__CONFIGURATION;
+
+    eERRORRESULT ret;
+    MCP251XFD_Filter MCP251863_NoFilter[1] = {
+        { 
+            .Filter = MCP251XFD_FILTER0, 
+            .EnableFilter = true, 
+            .Match = MCP251XFD_MATCH_ONLY_SID,
+            .AcceptanceID = MCP251XFD_ACCEPT_ALL_MESSAGES, 
+            .AcceptanceMask = MCP251XFD_ACCEPT_ALL_MESSAGES, 
+            .PointTo = MCP251XFD_FIFO1, 
+        }, // 0x000..0x1FF
+    };
+    ret = Init_MCP251XFD(dev, conf);
+    if(ret != ERR_OK) return ret;
+    // ESP_LOGI("MCP INIT","Initialization result: %d", ret);
+    ret = MCP251XFD_ConfigureTimeStamp(dev, true, MCP251XFD_TS_CAN20_SOF_CANFD_SOF, TIMESTAMP_TICK(MCP251863_CRYCLK), false);
+    if(ret != ERR_OK) return ret;
+    // ESP_LOGI("MCP INIT","Timestamp setup result: %d", ret);
+    ret = MCP251XFD_ConfigureFIFOList(dev, fifoConf, fifoCount);
+    if(ret != ERR_OK) return ret;
+    //ESP_LOGI("MCP INIT","FIFO Setup result: %d", ret);
+    ret = MCP251XFD_ConfigureFilterList(dev, MCP251XFD_D_NET_FILTER_DISABLE, MCP251863_NoFilter, 1);
+    if(ret != ERR_OK) return ret;
+    //ESP_LOGI("MCP INIT","Filter Setup result: %d", ret);
+    ret = MCP251XFD_StartCANFD(dev);
+    return ret;
+}
+
 uint32_t messageSEQ = 0;
-eERRORRESULT transmitCount(MCP251XFD *dev, uint8_t num){
+MCPError transmitCount(MCP251XFD *dev, uint8_t num){
     eERRORRESULT ErrorExt1 = ERR_OK;
     eMCP251XFD_FIFOstatus FIFOstatus = 0;
     ErrorExt1 = MCP251XFD_GetFIFOStatus(dev, MCP251XFD_FIFO2, &FIFOstatus); // First get FIFO2 status
@@ -122,14 +109,13 @@ eERRORRESULT transmitCount(MCP251XFD *dev, uint8_t num){
         //Send message and flush
         ErrorExt1 = MCP251XFD_TransmitMessageToFIFO(dev, &TansmitMessage, MCP251XFD_FIFO2, true);
     }else{
-        
+        ESP_LOGW("CANTX", "FIFO FULL!, Status: %d", FIFOstatus);
     }
-
-    ESP_LOGW("CANTX", "FIFO FULL!, Status: %d", FIFOstatus);
+    
     return ErrorExt1;
 }
 
-eERRORRESULT receiveMessage(MCP251XFD *dev){
+MCPError receiveMessage(MCP251XFD *dev){
     eERRORRESULT ErrorExt1 = ERR_OK;
     eMCP251XFD_FIFOstatus FIFOstatus = 0;
     ErrorExt1 = MCP251XFD_GetFIFOStatus(dev, MCP251XFD_FIFO1, &FIFOstatus); // First get FIFO1 status
@@ -139,28 +125,23 @@ eERRORRESULT receiveMessage(MCP251XFD *dev){
     } 
     if ((FIFOstatus & MCP251XFD_RX_FIFO_NOT_EMPTY) > 0) // Second check FIFO not empty
     {
-        uint32_t MessageTimeStamp = 0;
         uint8_t RxPayloadData[64]; // In this example, the FIFO1 have 64 bytes of payload
         MCP251XFD_CANMessage ReceivedMessage;
         ReceivedMessage.PayloadData = &RxPayloadData[0]; // Add receive payload data pointer to the message structure
         // that will be received
-        ErrorExt1 = MCP251XFD_ReceiveMessageFromFIFO(dev, &ReceivedMessage, MCP251XFD_PAYLOAD_64BYTE,
-        &MessageTimeStamp, MCP251XFD_FIFO1);
+        ErrorExt1 = MCP251XFD_ReceiveMessageFromFIFO(dev, &ReceivedMessage, MCP251XFD_PAYLOAD_8BYTE,
+        NULL, MCP251XFD_FIFO1);
         if (ErrorExt1 == ERR_OK)
         {
             printCANMessage(&ReceivedMessage);
             // ESP_LOGI("CANRX", "%"PRIu32", Received Message #%"PRIu32" from 0x%08" PRIx32 " with %d bytes. ", MessageTimeStamp, ReceivedMessage.MessageSEQ, ReceivedMessage.MessageID, ReceivedMessage.DLC);
         }
-    }else{
+    }else if(FIFOstatus != 0){
         ESP_LOGI("CANRX","FIFO Status %d", FIFOstatus);
     }
 
     return ErrorExt1;
 }
-
-
-#define TIMESTAMP_TICK_us       ( 25 )      // TimeStamp tick is 25s
-#define TIMESTAMP_TICK(sysclk)  ( ((sysclk) / 1000000) * TIMESTAMP_TICK_us )
 
 void app_main(void)
 {
@@ -193,13 +174,14 @@ void app_main(void)
     ESP_ERROR_CHECK(spi_bus_initialize(CANSPI_HOST, &buscfg, SPI_DMA_CH_AUTO));
     // ESP_ERROR_CHECK(spi_bus_add_device(CANSPI_HOST, &devcfgCAN, &spi));
     
-    MCP251XFD MCP251863_Driver1_Conf = DEFAULT_MCP251863_DRIVER_CONFIG(&spi);
-    MCP251XFD_Config MCP251863_can_if1 = DEFAULT_MCP251863_CONTROLLER_CONFIG(&MCP251863_SYSCLK1, &MCP251863_BTStats);
+    MCP251XFD MCP251863_CAN1 = DEFAULT_MCP251863_DRIVER_CONFIG(&spi);
+    MCP251XFD_Config MCP251863_CAN1_conf = DEFAULT_MCP251863_CONTROLLER_CONFIG(&MCP251863_SYSCLK1, &MCP251863_BTStats);
+    MCP251863_CAN1.DriverConfig |= MCP251XFD_DRIVER_INIT_SET_RAM_AT_0;
     #define MCP251863_FIFO_COUNT  2
-    #define MCP251863_FILTER_COUNT 1
+    // #define MCP251863_FILTER_COUNT 1
 
-    MCP251XFD_RAMInfos MCP251863_FIFOs_RAMInfos[MCP251863_FIFO_COUNT];
-    MCP251XFD_FIFO MCP251863_FIFO_Conf[MCP251863_FIFO_COUNT] = {
+    MCP251XFD_RAMInfos MCP251863_CAN1_FIFO_RAMInfos[MCP251863_FIFO_COUNT];
+    MCP251XFD_FIFO MCP251863_CAN1_FIFO_Conf[MCP251863_FIFO_COUNT] = {
         { 
             .Name = MCP251XFD_FIFO1, 
             .Size = MCP251XFD_FIFO_8_MESSAGE_DEEP, 
@@ -207,7 +189,7 @@ void app_main(void)
             .Direction = MCP251XFD_RECEIVE_FIFO, 
             .ControlFlags = MCP251XFD_FIFO_NO_TIMESTAMP_ON_RX,
             .InterruptFlags = MCP251XFD_FIFO_OVERFLOW_INT + MCP251XFD_FIFO_RECEIVE_FIFO_NOT_EMPTY_INT,
-            .RAMInfos = &MCP251863_FIFOs_RAMInfos[0], 
+            .RAMInfos = &MCP251863_CAN1_FIFO_RAMInfos[0], 
         }, // SID: 0x000..0x1FF ; No EID
         { 
             .Name = MCP251XFD_FIFO2, 
@@ -218,58 +200,71 @@ void app_main(void)
             .Priority = MCP251XFD_MESSAGE_TX_PRIORITY16, 
             .ControlFlags = MCP251XFD_FIFO_NO_RTR_RESPONSE,
             .InterruptFlags = MCP251XFD_FIFO_TX_ATTEMPTS_EXHAUSTED_INT + MCP251XFD_FIFO_TRANSMIT_FIFO_NOT_FULL_INT,
-            .RAMInfos = &MCP251863_FIFOs_RAMInfos[1], 
+            .RAMInfos = &MCP251863_CAN1_FIFO_RAMInfos[1], 
         },
     };
 
-    MCP251XFD_Filter MCP251863_FilterList[MCP251863_FILTER_COUNT] = {
-        { 
-            .Filter = MCP251XFD_FILTER0, 
-            .EnableFilter = true, 
-            .Match = MCP251XFD_MATCH_ONLY_SID,
-            .AcceptanceID = MCP251XFD_ACCEPT_ALL_MESSAGES, 
-            .AcceptanceMask = 0x7FF, 
-            .PointTo = MCP251XFD_FIFO1, 
-        }, // 0x000..0x1FF
-    };
+    // MCP251XFD_Filter MCP251863_FilterList[MCP251863_FILTER_COUNT] = {
+    //     { 
+    //         .Filter = MCP251XFD_FILTER0, 
+    //         .EnableFilter = true, 
+    //         .Match = MCP251XFD_MATCH_ONLY_SID,
+    //         .AcceptanceID = MCP251XFD_ACCEPT_ALL_MESSAGES, 
+    //         .AcceptanceMask = MCP251XFD_ACCEPT_ALL_MESSAGES, 
+    //         .PointTo = MCP251XFD_FIFO1, 
+    //     }, // 0x000..0x1FF
+    // };
 
-    eERRORRESULT ret = Init_MCP251XFD(&MCP251863_Driver1_Conf, &MCP251863_can_if1);
-    ESP_LOGD("MCP INIT","Initialization result: %d", ret);
-    ret = MCP251XFD_ConfigureTimeStamp(&MCP251863_Driver1_Conf, true, MCP251XFD_TS_CAN20_SOF_CANFD_SOF, TIMESTAMP_TICK(MCP251863_CRYCLK), false);
-    ESP_LOGI("MCP INIT","Timestamp setup result: %d", ret);
-    ret = MCP251XFD_ConfigureFIFOList(&MCP251863_Driver1_Conf, MCP251863_FIFO_Conf, MCP251863_FIFO_COUNT);
-    ESP_LOGD("MCP INIT","FIFO Setup result: %d", ret);
-    ret = MCP251XFD_ConfigureFilterList(&MCP251863_Driver1_Conf, MCP251XFD_D_NET_FILTER_DISABLE, MCP251863_FilterList, MCP251863_FILTER_COUNT);
-    ESP_LOGD("MCP INIT","Filter Setup result: %d", ret);
+    eERRORRESULT ret;// = Init_MCP251XFD(&MCP251863_Driver1_Conf, &MCP251863_can_if1);
+    // ESP_LOGI("MCP INIT","Initialization result: %d", ret);
+    // ret = MCP251XFD_ConfigureTimeStamp(&MCP251863_Driver1_Conf, true, MCP251XFD_TS_CAN20_SOF_CANFD_SOF, TIMESTAMP_TICK(MCP251863_CRYCLK), false);
+    // ESP_LOGI("MCP INIT","Timestamp setup result: %d", ret);
+    // ret = MCP251XFD_ConfigureFIFOList(&MCP251863_Driver1_Conf, MCP251863_FIFO_Conf, MCP251863_FIFO_COUNT);
+    // ESP_LOGI("MCP INIT","FIFO Setup result: %d", ret);
+    // ret = MCP251XFD_ConfigureFilterList(&MCP251863_Driver1_Conf, MCP251XFD_D_NET_FILTER_DISABLE, MCP251863_FilterList, MCP251863_FILTER_COUNT);
+    // ESP_LOGI("MCP INIT","Filter Setup result: %d", ret);
+
+    // ret = MCP251XFD_StartCANFD(&MCP251863_Driver1_Conf);
+    // ESP_LOGI("MCP INIT","Started in FD mode: %d", ret);
+
+    ret = MCP251863DeviceSetup(&MCP251863_CAN1, &MCP251863_CAN1_conf, MCP251863_CAN1_FIFO_Conf, MCP251863_FIFO_COUNT);
 
     eMCP251XFD_Devices device;
     uint8_t deviceId;
     uint8_t deviceRev;
-    ret = MCP251XFD_GetDeviceID(&MCP251863_Driver1_Conf, &device, &deviceId, &deviceRev);
-    ESP_LOGD("MCP INIT","Device ID result: %d", ret);
+    ret = MCP251XFD_GetDeviceID(&MCP251863_CAN1, &device, &deviceId, &deviceRev);
+    ESP_LOGI("MCP INIT","Device ID result: %d", ret);
     ESP_LOGI("MCP INIT","Device %d, ID %x, REV %x", device, deviceId, deviceRev);
 
-    ret = MCP251XFD_StartCANFD(&MCP251863_Driver1_Conf);
-    ESP_LOGD("MCP INIT","Started in FD mode: %d", ret);
+    // printf(LOG_COLOR(LOG_COLOR_CYAN)"Register states after start\n");
 
-    ESP_LOGD("Main Loop","transmit result: %d", transmitCount(&MCP251863_Driver1_Conf, 1));
+    // GetAndShowMCP251XFD_SFRreg(&MCP251863_Driver1_Conf);
+    // GetAndShowMCP251XFD_CANSFRreg(&MCP251863_Driver1_Conf);
+    // GetAndShowMCP251XFD_FIFOreg(&MCP251863_Driver1_Conf);
+    // GetAndShowMCP251XFD_FILTERreg(&MCP251863_Driver1_Conf);
 
-    GetAndShowMCP251XFD_SFRreg(&MCP251863_Driver1_Conf);
-    GetAndShowMCP251XFD_CANSFRreg(&MCP251863_Driver1_Conf);
-    GetAndShowMCP251XFD_FIFOreg(&MCP251863_Driver1_Conf);
-    GetAndShowMCP251XFD_FILTERreg(&MCP251863_Driver1_Conf);
+    ESP_LOGI("Main Loop","transmit result: %d", transmitCount(&MCP251863_CAN1, 1));
+
+    // printf(LOG_COLOR(LOG_COLOR_CYAN)"Register states after transmit\n");
+
+    // GetAndShowMCP251XFD_SFRreg(&MCP251863_Driver1_Conf);
+    // GetAndShowMCP251XFD_CANSFRreg(&MCP251863_Driver1_Conf);
+    // GetAndShowMCP251XFD_FIFOreg(&MCP251863_Driver1_Conf);
+    // GetAndShowMCP251XFD_FILTERreg(&MCP251863_Driver1_Conf);
 
     uint8_t data = 0;
+    uint64_t time = esp_timer_get_time()/1000;
     for(;;){
-        toggleLED();
-        // sendMessages(spi,data);
-        // ESP_LOGI("Counter", "%d", data);
+        if(esp_timer_get_time()/1000 - time > 1000){
+            time = esp_timer_get_time()/1000;
+            toggleLED();
+            transmitCount(&MCP251863_CAN1, data);
+            ESP_LOGI("Counter", "%d", data);
+            data++;
+        }
         // ESP_LOGD("Main Loop","transmit result: %d", transmitCount(&MCP251863_Driver1_Conf, data));
         // ESP_LOGD("Main Loop", "recive result: %d", receiveMessage(&MCP251863_Driver1_Conf));
-        receiveMessage(&MCP251863_Driver1_Conf);
-        s_led_state = !s_led_state;
-        data++;
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        receiveMessage(&MCP251863_CAN1);
+        vTaskDelay(1 / portTICK_PERIOD_MS);
     }
-
 }

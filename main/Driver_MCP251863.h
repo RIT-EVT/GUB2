@@ -23,7 +23,7 @@
   /*--- CRC16-USB call function ---*/                               \
   .fnComputeCRC16  = MCP251863DeviceComputeCRC16,                   \
   /*--- Interface clocks ---*/                                      \
-  .SPIClockSpeed   = 1000000, /*1MHz*/                              \
+  .SPIClockSpeed   = 5000000, /*5MHz*/                            \
 };
 
 #define DEFAULT_MCP251863_CONTROLLER_CONFIG(SYSCLK, BTSTATS)   {                    \
@@ -47,6 +47,11 @@
     /*--- Interrupts ---*/                                                              \
     .SysInterruptFlags = MCP251XFD_INT_ENABLE_ALL_EVENTS - MCP251XFD_INT_TX_EVENT,      \
 };
+
+#define TIMESTAMP_TICK_us       ( 25 )      // TimeStamp tick is 25s
+#define TIMESTAMP_TICK(sysclk)  ( ((sysclk) / 1000000) * TIMESTAMP_TICK_us )
+
+typedef eERRORRESULT MCPError;
 
 eERRORRESULT MCP251863DeviceInit(void *pIntDev, uint8_t chipSelect, const uint32_t sckFreq);
 
