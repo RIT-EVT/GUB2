@@ -1,0 +1,20 @@
+menu "GUB2 Configuration"
+
+    config ESP_WIFI_SSID
+        string "SoftAP SSID"
+        default "GUB2AP"
+        help
+            SSID (network name) to set up the softAP with.
+
+    config ESP_WIFI_PASSWORD
+        string "SoftAP Password"
+        default "test1234"
+        help
+            WiFi password (WPA or WPA2) for the example to use for the softAP.
+
+    config ESP_MAX_STA_CONN
+        int "Maximum STA connections"
+        default 4
+        help
+            Max number of the STA connects to AP.
+endmenu

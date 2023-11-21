@@ -13,19 +13,30 @@
 #include "freertos/ringbuf.h"
 #include "esp_system.h"
 #include "esp_timer.h"
+#include "esp_event.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "nvs_flash.h"
+#include "esp_mac.h"
+#include "esp_wifi.h"
+#include "esp_netif.h"
+#include "lwip/inet.h"
 
 #include "MCP251XFD.h"
 
 #include "GUB2.h"
 #include "Driver_MCP251863.h"
+#include "Fileserver.h"
 
 #define rbALIGN_MASK (0x03)
 #define rbALIGN_SIZE( xSize )       ( ( xSize + rbALIGN_MASK ) & ~rbALIGN_MASK )
 
 #define BUFFER_SIZE 40
+
+#define ESP_WIFI_SSID "GUB2AP" //CONFIG_ESP_WIFI_SSID
+#define ESP_WIFI_PASS "test1234"// CONFIG_ESP_WIFI_PASSWORD
+#define MAX_STA_CONN  4 //CONFIG_ESP_MAX_STA_CONN
 
 static const char *TAG = "GUB2";
 
@@ -47,6 +58,55 @@ uint32_t MCP251863_SYSCLK1;
 // }
 
 
+static void wifi_event_handler(void *arg, esp_event_base_t event_base,
+                               int32_t event_id, void *event_data)
+{
+    if (event_id == WIFI_EVENT_AP_STACONNECTED) {
+        wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
+        ESP_LOGI(TAG, "station " MACSTR " join, AID=%d",
+                 MAC2STR(event->mac), event->aid);
+    } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+        wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
+        ESP_LOGI(TAG, "station " MACSTR " leave, AID=%d",
+                 MAC2STR(event->mac), event->aid);
+    }
+}
+
+static void wifi_init_softap(void)
+{
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    esp_wifi_init(&cfg);
+
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
+
+    wifi_config_t wifi_config = {
+        .ap = {
+            .ssid = ESP_WIFI_SSID,
+            .ssid_len = strlen(ESP_WIFI_SSID),
+            .password = ESP_WIFI_PASS,
+            .max_connection = MAX_STA_CONN,
+            .authmode = WIFI_AUTH_WPA_WPA2_PSK
+        },
+    };
+    if (strlen(ESP_WIFI_PASS) == 0) {
+        wifi_config.ap.authmode = WIFI_AUTH_OPEN;
+    }
+
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_start());
+
+    esp_netif_ip_info_t ip_info;
+    esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_AP_DEF"), &ip_info);
+
+    char ip_addr[16];
+    inet_ntoa_r(ip_info.ip.addr, ip_addr, 16);
+    ESP_LOGI(TAG, "Set up softAP with IP: %s", ip_addr);
+
+    ESP_LOGI(TAG, "wifi_init_softap finished. SSID:'%s' password:'%s'",
+             ESP_WIFI_SSID, ESP_WIFI_PASS);
+}
+
 void printCANMessage(MCP251XFD_CANMessage *msg){
     printf(LOG_COLOR(LOG_COLOR_PURPLE)"Message #%"PRIu32" ID: 0x%08" PRIx32 " with %d bytes of data: ", msg->MessageSEQ, msg->MessageID, msg->DLC);
     for(int i=0; i<msg->DLC; i++){
@@ -57,7 +117,10 @@ void printCANMessage(MCP251XFD_CANMessage *msg){
 
 void reduceLogging(){
     esp_log_level_set("spi_master", ESP_LOG_INFO);
-    
+    esp_log_level_set("httpd_uri", ESP_LOG_ERROR);
+    esp_log_level_set("httpd_txrx", ESP_LOG_ERROR);
+    esp_log_level_set("httpd_parse", ESP_LOG_ERROR);
+    esp_log_level_set("event", ESP_LOG_INFO);
 }
 
 int listDir(const char *base_path){
@@ -317,7 +380,7 @@ void app_main(void)
     ESP_LOGD(TAG, "debug logging");
     initLED();
     reduceLogging();
-
+    sys_delay_ms(1000);
     ESP_LOGI(TAG, "Setting up SPI");
 
     // esp_err_t ret;
@@ -392,24 +455,11 @@ void app_main(void)
     if(!r){
         sdmmc_card_print_info(stdout, &card);
     }
-    // printf(LOG_COLOR(LOG_COLOR_CYAN)"Register states after start\n");
-
-    // GetAndShowMCP251XFD_SFRreg(&MCP251863_Driver1_Conf);
-    // GetAndShowMCP251XFD_CANSFRreg(&MCP251863_Driver1_Conf);
-    // GetAndShowMCP251XFD_FIFOreg(&MCP251863_Driver1_Conf);
-    // GetAndShowMCP251XFD_FILTERreg(&MCP251863_Driver1_Conf);
     
     listDir(base_path);
     listDir(canLogPath);
 
     ESP_LOGI("Main Loop","transmit result: %d", transmitCount(&MCP251863_CAN1, 1));
-
-    // printf(LOG_COLOR(LOG_COLOR_CYAN)"Register states after transmit\n");
-
-    // GetAndShowMCP251XFD_SFRreg(&MCP251863_Driver1_Conf);
-    // GetAndShowMCP251XFD_CANSFRreg(&MCP251863_Driver1_Conf);
-    // GetAndShowMCP251XFD_FIFOreg(&MCP251863_Driver1_Conf);
-    // GetAndShowMCP251XFD_FILTERreg(&MCP251863_Driver1_Conf);
 
     uint8_t RxPayloadData[64]; // In this example, the FIFO1 have 64 bytes of payload
     MCP251XFD_CANMessage receivedMessage;
@@ -426,14 +476,25 @@ void app_main(void)
         mkdir(canLogPath, 0777);
     }
 
-    // sprintf(pathBuf, "%s/%s", canLogPath, "test.bin");
-    // FILE *ftest = fopen(pathBuf, "a");
-    // if(ftest != NULL){
-    //     fprintf(ftest, "Test String!");
-    //     fclose(ftest);
-    // }else{
-    //     ESP_LOGE("FILE","Unable to open file \"%s\", got %d (%s)", pathBuf, errno, strerror(errno));
-    // }
+    //############################################
+    //#####             WiFi                ######
+    //############################################
+    // Initialize networking stack
+    ESP_ERROR_CHECK(esp_netif_init());
+
+    // Create default event loop needed by the  main app
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    // Initialize NVS needed by Wi-Fi
+    ESP_ERROR_CHECK(nvs_flash_init());
+
+    // Initialize Wi-Fi including netif with default config
+    esp_netif_create_default_wifi_ap();
+
+    wifi_init_softap();
+
+    //Start File server
+    start_file_server(base_path);
 
     sprintf(pathBuf, "%s/%s", canLogPath, "CanLog.bin");
     FILE *f = fopen(pathBuf, "wb");
