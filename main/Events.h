@@ -1,0 +1,17 @@
+#ifndef EVENTS_H
+#define EVENTS_H
+
+#include <esp_event.h>
+
+ESP_EVENT_DEFINE_BASE(CANBUS_EVENT);
+
+enum CANEvent {
+    CAN_MESSAGE_RECIEVED,
+    CAN_MESSAGE_TRANSMIT,
+    CAN_BUS_ERROR,
+    CAN_FIFO_FULL,
+    CAN_FIFO_ERROR,
+    CAN_BUFFER_FULL,
+};
+
+#endif //EVENTS_H
