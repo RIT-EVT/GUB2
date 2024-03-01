@@ -2,10 +2,44 @@
 
 #include <string.h>
 #include <esp_log.h>
+#include <esp_timer.h>
 
 #include "Events.h"
 
 static const char *TAG = "CANDriver";
+
+/**
+ * ! These are copied from ringbuf.c to fix the buffer getting stuck, if the tool chain is updated from 5.1.1
+ * ! the GUB should be tested without this hack and this will hopefully be removed!
+*/
+typedef BaseType_t (*ringbufFuncPointer)(int args);
+typedef struct RingbufferDefinition {
+    size_t xSize;                               //Size of the data storage
+    size_t xMaxItemSize;                        //Maximum item size
+    UBaseType_t uxRingbufferFlags;              //Flags to indicate the type and status of ring buffer
+
+    ringbufFuncPointer xCheckItemFits;     //Function to check if item can currently fit in ring buffer
+    ringbufFuncPointer vCopyItem;               //Function to copy item to ring buffer
+    ringbufFuncPointer pvGetItem;                //Function to get item from ring buffer
+    ringbufFuncPointer vReturnItem;           //Function to return item to ring buffer
+    ringbufFuncPointer xGetCurMaxSize;     //Function to get current free size
+
+    uint8_t *pucAcquire;                        //Acquire Pointer. Points to where the next item should be acquired.
+    uint8_t *pucWrite;                          //Write Pointer. Points to where the next item should be written
+    uint8_t *pucRead;                           //Read Pointer. Points to where the next item should be read from
+    uint8_t *pucFree;                           //Free Pointer. Points to the last item that has yet to be returned to the ring buffer
+    uint8_t *pucHead;                           //Pointer to the start of the ring buffer storage area
+    uint8_t *pucTail;                           //Pointer to the end of the ring buffer storage area
+
+    BaseType_t xItemsWaiting;                   //Number of items/bytes(for byte buffers) currently in ring buffer that have not yet been read
+    List_t xTasksWaitingToSend;                 //List of tasks that are blocked waiting to send/acquire onto this ring buffer. Stored in priority order.
+    List_t xTasksWaitingToReceive;              //List of tasks that are blocked waiting to receive from this ring buffer. Stored in priority order.
+    QueueSetHandle_t xQueueSet;                 //Ring buffer's read queue set handle.
+
+    portMUX_TYPE mux;                           //Spinlock required for SMP
+} RingBufferHack_t;
+
+// ! END HACK
 
 /**
  * The ISR handler for the INT1 pin
@@ -28,12 +62,6 @@ void IRAM_ATTR CANDriverISRHandler(void *arg) {
         dev->fifoErrors++;
         return;
     }
-    //TODO Replace with staticly allocated memory
-    // uint8_t *payload = (uint8_t*) malloc(sizeof(uint8_t) * tempMessage.DLC);
-    // if(payload == NULL){
-    //     // ESP_LOGE(TAG, "Unable to allocate buffer");
-    //     return;
-    // }
 
     memcpy(receivedMessage.payload, tempMessage.PayloadData, sizeof(uint8_t) * tempMessage.DLC);
     // receivedMessage.payload = payload;
@@ -66,7 +94,7 @@ void CANDriverInit(){
  * @param csPin The chip select pin 
  * @param interuptPin the INT1 pin from the chip
 */
-int CANDriverAddBus(int bus, int csPin, int interruptPin) {
+int CANDriverAddBus(int bus, int csPin, int interruptPin, int standbyPin) {
     if(bus >= CAN_BUS_COUNT || bus < 0) return -1;
 
     //setup device info
@@ -76,7 +104,7 @@ int CANDriverAddBus(int bus, int csPin, int interruptPin) {
     dev->receiveBufferFullErrors=0;
     dev->fifoErrors=0;
 
-    MCP251XFD mcp2517fd = DEFAULT_MCP251863_DRIVER_CONFIG(&dev->spi, PIN_NUM_CAN_CS);
+    MCP251XFD mcp2517fd = DEFAULT_MCP251863_DRIVER_CONFIG(&dev->spi, csPin);
     mcp2517fd.DriverConfig |= MCP251XFD_DRIVER_INIT_SET_RAM_AT_0;
     memcpy(&dev->device, &mcp2517fd, sizeof(MCP251XFD));
 
@@ -111,14 +139,21 @@ int CANDriverAddBus(int bus, int csPin, int interruptPin) {
     ret = MCP251863DeviceSetup(&dev->device, &MCP251863_CAN_conf, MCP251863_CAN_FIFO_Conf, CAN_FIFO_COUNT);
 
     // configure the interupt pin
-    gpio_config_t int1Conf = {};
-    int1Conf.mode = GPIO_MODE_INPUT;
-    int1Conf.intr_type = GPIO_INTR_LOW_LEVEL;
-    int1Conf.pull_down_en = 0;
-    int1Conf.pull_up_en = 0;
-    int1Conf.pin_bit_mask = (1ULL << interruptPin);
+    gpio_config_t pinConf = {};
+    pinConf.mode = GPIO_MODE_INPUT;
+    pinConf.intr_type = GPIO_INTR_LOW_LEVEL;
+    pinConf.pull_down_en = 0;
+    pinConf.pull_up_en = 0;
+    pinConf.pin_bit_mask = (1ULL << interruptPin);
+    gpio_config(&pinConf);
 
-    gpio_config(&int1Conf);
+    //Configure standby pin
+    pinConf.mode = GPIO_MODE_OUTPUT;
+    pinConf.intr_type = GPIO_INTR_DISABLE;
+    pinConf.pin_bit_mask = (1ULL << standbyPin);
+    gpio_config(&pinConf);
+
+    gpio_set_level(standbyPin, 0);
 
     gpio_isr_handler_add(interruptPin, CANDriverISRHandler, (void*) dev);
 
@@ -161,16 +196,28 @@ void CANDriverUpdate(){
     }
      
     // If no message return immediately 
-    if(!CANDriverGetQueueLen()) return;
+    // if(!CANDriverGetQueueLen()) return;
 
     size_t itemSize;
     CANMessage *receivedMessage;
-    while((receivedMessage = (CANMessage*)xRingbufferReceive(driver.messageBuffer, &itemSize, pdMS_TO_TICKS(10))) != NULL && receiveCount < 5){
+    int count = 0;
+    while((receivedMessage = (CANMessage*)xRingbufferReceive(driver.messageBuffer, &itemSize, 0)) != NULL && count < 5){
         receiveCount++;
-        esp_event_post(CANBUS_EVENT, CAN_MESSAGE_RECIEVED, receivedMessage, sizeof(CANMessage), 200);
+        count++;
+        esp_event_post(CANBUS_EVENT, CAN_MESSAGE_RECIEVED, receivedMessage, sizeof(CANMessage), 2);
         vRingbufferReturnItem(driver.messageBuffer, (void*) receivedMessage);
     }
-    
+
+    // Fix the ring buffer if it gets stuck. I should not have to do this, but here we are. 
+    // The ESP-IDF is the dumbest tool chain I have seen. The ring buffer will sometimes fail
+    // to clear the rbBUFFER_FULL_FLAG resulting in the buffer permanently dropping items despite
+    // being empty, so we fix that here. Dumb thing should just work.
+    RingBufferHack_t *ringbuffer = (RingBufferHack_t *)driver.messageBuffer;
+    if(ringbuffer->xItemsWaiting == 0 && (ringbuffer->uxRingbufferFlags & 0x4)){
+        ESP_LOGW(TAG, "Buffer dumb, attempting fix!");
+        ringbuffer->uxRingbufferFlags &= ~0x4;
+    }
+
 }
 
 void sendMessage(spi_device_handle_t spi, uint8_t data){

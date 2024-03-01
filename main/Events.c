@@ -1,0 +1,3 @@
+#include "Events.h"
+
+ESP_EVENT_DEFINE_BASE(CANBUS_EVENT);

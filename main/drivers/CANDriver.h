@@ -101,7 +101,7 @@ typedef struct
 static CANDriver_t driver;
 
 void CANDriverInit();
-int CANDriverAddBus(int bus, int csPin, int interruptPin);
+int CANDriverAddBus(int bus, int csPin, int interruptPin, int standbyPin);
 
 void CANDriverUpdate();
 

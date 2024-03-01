@@ -12,6 +12,8 @@
 
 //temp
 #include "drivers/CANDriver.h"
+#include "FileLogger.h"
+
 static const char *TAG = "GUB2";
 
 //GUB State
@@ -37,12 +39,17 @@ void GUBInit(){
         sdmmc_card_print_info(stdout, &SDcard);
     }
     
+    fileLoggerInit();
+
     listDir(SDcardBasePath);
     listDir(canLogPath);
 
     ESP_LOGI(TAG, "GUB Setup, starting main loop");
 }
 
+/**
+ * Start the main loop for the GUB
+*/
 void GUBStart(){
     xTaskCreate(
         GUBloop,
@@ -57,38 +64,24 @@ void GUBStart(){
         ESP_LOGE(TAG, "Unable to create main task!");
     }
 }
+
 /**
  * Main loop for GUB task
 */
 void GUBloop(void *pvParam){
     while (true)
     {
-        GUBHeartbeatHandler();
+        GUBHeartbeatUpdate();
         CANDriverUpdate();
-        vTaskDelay(1);//pdMS_TO_TICKS(2));
+        
+        fileLoggerUpdate();
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
 
-void GUBToggleLED(){
-    #if LED_IS_NEOPIXEL==1
-    /* If the addressable LED is enabled */
-    if (GUBState.ledState) {
-        /* Set the LED pixel using RGB from 0 (0%) to 255 (100%) for each color */
-        led_strip_set_pixel(GUBState.ledStrip, 0, 0, 16, 0);
-        /* Refresh the strip to send data */
-        led_strip_refresh(GUBState.ledStrip);
-    } else {
-        /* Set all LED off to clear all pixels */
-        led_strip_clear(GUBState.ledStrip);
-    }
-    #else
-
-    gpio_set_level(PIN_NUM_HEARTBEAT, GUBState.ledState);
-    #endif
-    
-    GUBState.ledState = !GUBState.ledState;
-}
-
+/**
+ * Setup the heartbeat led
+*/
 void GUBInitLED(){
     GUBState.lastHeartbeat = 0;
     #if LED_IS_NEOPIXEL==1
@@ -112,13 +105,43 @@ void GUBInitLED(){
     #endif
 }
 
-void GUBHeartbeatHandler(){
+void GUBToggleLED(){
+    #if LED_IS_NEOPIXEL==1
+    /* If the addressable LED is enabled */
+    if (GUBState.ledState) {
+        /* Set the LED pixel using RGB from 0 (0%) to 255 (100%) for each color */
+        led_strip_set_pixel(GUBState.ledStrip, 0, 0, 16, 0);
+        /* Refresh the strip to send data */
+        led_strip_refresh(GUBState.ledStrip);
+    } else {
+        /* Set all LED off to clear all pixels */
+        led_strip_clear(GUBState.ledStrip);
+    }
+    #else
+
+    gpio_set_level(PIN_NUM_HEARTBEAT, GUBState.ledState);
+    #endif
+    
+    GUBState.ledState = !GUBState.ledState;
+}
+
+/**
+ * Update heartbeat led
+*/
+void GUBHeartbeatUpdate(){
     if(esp_timer_get_time() - GUBState.lastHeartbeat > HEARTBEAT_PERIOD){
         GUBState.lastHeartbeat = esp_timer_get_time();
         GUBToggleLED();
     }
 }
 
+/*****************************************
+ *          SD card functions            *
+ *****************************************/
+
+/**
+ * Mount the SD card
+*/
 int GUBMountSDCard(const char* basePath, sdmmc_card_t *card){
     ESP_LOGI(TAG, "Initilizing SD Card");
 

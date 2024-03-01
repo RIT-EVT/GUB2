@@ -46,7 +46,7 @@ void GUBloop(void *pvParam);
 
 void GUBInitLED();
 void GUBToggleLED();
-void GUBHeartbeatHandler();
+void GUBHeartbeatUpdate();
 
 int GUBMountSDCard(const char* basePath, sdmmc_card_t *card);
 int listDir(const char *base_path);
