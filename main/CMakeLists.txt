@@ -2,14 +2,12 @@
 set(SOURCES 
     "main.c" 
     "GUB2.c" 
-   
     "Fileserver.c" 
-    "Filelogger.c"
+    "CANLogger.c"
     "drivers/WIFIDriver.c" 
     "drivers/Driver_MCP251863.c" 
     "drivers/CANDriver.c"
     "datatypes/CircularBuffer.c"
-    "Events.c"
 )
 
 

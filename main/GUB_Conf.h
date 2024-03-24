@@ -62,12 +62,13 @@
  * SD card configuration defines
 */
 
-#define MAX_FILE_HANDLERS   5
-#define FLUSH_LOG_INTERVAL  10000
-#define MAX_LOG_SIZE        1000
+#define MAX_FILE_HANDLERS               5
+#define FLUSH_LOG_INTERVAL              10000
+#define MAX_LOG_SIZE                    1000
+#define SD_CARD_STATUS_CHECK_INTERVAL   1000 * 1000 //1 Second
 
-#define SD_CARD_MOUNT_PATH  "/data/"
-#define CAN_LOG_PATH        SD_CARD_MOUNT_PATH "CANLogs/"
+#define SD_CARD_MOUNT_PATH      "/data"
+#define SD_CARD_CAN_LOG_PATH    SD_CARD_MOUNT_PATH "/CANLogs/"
 
 // File base name. Will have the format <BaseName><duplicate>_<timestamp>-<split>
 #define CAN_LOG_BASE_NAME   "CANLOG"

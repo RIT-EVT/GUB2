@@ -1,34 +1,33 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <dirent.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <sys/unistd.h>
-#include <time.h>
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <stdint.h>
+// #include <string.h>
+// #include <dirent.h>
+// #include <errno.h>
+// #include <sys/stat.h>
+// #include <sys/unistd.h>
+// #include <time.h>
 
-//TODO Remove unneeded imports
+// //TODO Remove unneeded imports
 #include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/ringbuf.h>
-#include <esp_system.h>
-#include <esp_timer.h>
+// #include <freertos/task.h>
+// #include <freertos/ringbuf.h>
+// #include <esp_system.h>
+// #include <esp_timer.h>
 #include <esp_event.h>
 #include <driver/spi_master.h>
-#include <driver/gpio.h>
+// #include <driver/gpio.h>
 #include <esp_log.h>
 #include <nvs_flash.h>
-#include <esp_mac.h>
-#include <esp_wifi.h>
-#include <esp_netif.h>
-#include <lwip/inet.h>
-#include <esp_ipc.h>
+// #include <esp_mac.h>
+// #include <esp_wifi.h>
+// #include <esp_netif.h>
+// #include <lwip/inet.h>
+// #include <esp_ipc.h>
 
 #include "drivers/WIFIDriver.h"
 #include "drivers/CANDriver.h"
 #include "GUB2.h"
-// #include "drivers/Driver_MCP251863.h"
 #include "Fileserver.h"
 
 #include "GUB_Conf.h"
@@ -207,14 +206,14 @@ void app_main(void)
     wifi_init_softap();
 
     //Start File server
-    start_file_server(SDcardBasePath);
+    start_file_server(SD_CARD_BASE_PATH);
 
-    GUBStart();
+    // GUBStart();
 
     //main loop, not much here since most stuff is handled through the GUB task that can leverage both cores
     while (1)
     {
-        
+
         // Print Task information if debugging
         if(LOG_LOCAL_LEVEL == ESP_LOG_DEBUG){
             printTaskStats(pdMS_TO_TICKS(1000), false);

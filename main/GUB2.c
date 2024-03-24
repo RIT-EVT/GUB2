@@ -19,15 +19,6 @@ static const char *TAG = "GUB2";
 //GUB State
 GUBState_t gubState;
 
-//GUB main loop task, staticly allocated on the stack 
-// static StackType_t GUBThreadStack[GUB_STACK_SIZE + 1];
-// static StaticTask_t xGUBTaskBuffer;
-TaskHandle_t xGUBTask;
-
-
-//SD card 
-sdmmc_card_t SDcard;
-
 /**
  * A function for installing the GPIO ISR on a specific core.
 */
@@ -51,57 +42,73 @@ void GUBInit(){
     // CAN bus driver setup. Don't want to miss anything so do this first!
     CANDriverInit(gubState.gubEvents, CAN_EVENT);
     CANDriverAddBus(0, PIN_NUM_CAN1_CS, PIN_NUM_CAN1_RX_INT, PIN_NUM_CAN1_STB);
-
-    GUBInitLED();
-    // GUBInitSDCard();
-    int r = GUBMountSDCard(SDcardBasePath, &SDcard);
-    ESP_LOGI("SD_CARD", "SD card initialized with status %d", r);
-    if(!r){
-        sdmmc_card_print_info(stdout, &SDcard);
+    
+    ESP_LOGI(TAG, "Initializing SD Card SPI peripheral");
+    spi_bus_config_t busCFG = {
+        .mosi_io_num = PIN_NUM_SD_MOSI,
+        .miso_io_num = PIN_NUM_SD_MISO,
+        .sclk_io_num = PIN_NUM_SD_CLK,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+        .max_transfer_sz = 4092,
+    };
+    
+    //initialize SPI bus
+    esp_err_t ret;
+    ret = spi_bus_initialize(SD_SPI_HOST, &busCFG, SDSPI_DEFAULT_DMA);
+    if (ret == ESP_OK) {
+        int r = GUBMountSDCard(SD_CARD_BASE_PATH);
+        ESP_LOGI("SD_CARD", "SD card initialized with status %d", r);
+        if(!r){
+            sdmmc_card_print_info(stdout, gubState.SDcard);
+        }
+    } else {
+        ESP_LOGE(TAG, "Failed to initialize bus.");
     }
+
+    // Mount the SDCard 
+    
     
     canLoggerInit();
 
-    listDir(SDcardBasePath);
-    listDir(canLogPath);
+    listDir(SD_CARD_BASE_PATH);
+
+    GUBInitLED();
 
     ESP_LOGI(TAG, "GUB Setup, starting main loop");
+    xTaskCreate( GUBloop, "GUB", GUB_STACK_SIZE, NULL, 2, &gubState.mainTaskHandler);
 }
 
-/**
- * Start the main loop for the GUB
-*/
-void GUBStart(){
-    xTaskCreate(
-        GUBloop,
-        "GUB",
-        GUB_STACK_SIZE,
-        NULL,
-        2,
-        &xGUBTask
-    );
+// /**
+//  * Start the main loop for the GUB
+// */
+// void GUBStart(){
+    
 
-    if(xGUBTask == NULL){
-        ESP_LOGE(TAG, "Unable to create main task!");
-    }
-}
+//     if(xGUBTask == NULL){
+//         ESP_LOGE(TAG, "Unable to create main task!");
+//     }
+// }
 
 /**
  * Main loop for GUB task
 */
 void GUBloop(void *pvParam){
-    // uint32_t lastPrint = esp_timer_get_time();
-    while (true)
-    {
-        GUBHeartbeatUpdate();
-        CANDriverUpdate();
 
-        // if(esp_timer_get_time() - lastPrint > 1000000){
-        //     ESP_LOGD(TAG, "Unused Stack: %lu", uxTaskGetStackHighWaterMark2(xGUBTask));
-        //     lastPrint = esp_timer_get_time();
-        // }
-        
+    while (true)
+    {   
+        GUBHeartbeatUpdate();
+        checkSDCardStatus();
+        if(gubState.sdCardState == SD_NOT_MOUNTED && esp_timer_get_time() - gubState.lastMountAttempt > 1000000){
+            gubState.lastMountAttempt = esp_timer_get_time();
+            ESP_LOGW(TAG, "SD card not mounted! Attempting to remount...");
+            GUBMountSDCard(SD_CARD_BASE_PATH);
+        }
+
+        CANDriverUpdate();
         canLoggerUpdate();
+
+        
         vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
@@ -173,9 +180,14 @@ void printGUBStatus(){
 
 /**
  * Mount the SD card
+ * @param basePath the file base file path to mount the sd card to
 */
-int GUBMountSDCard(const char* basePath, sdmmc_card_t *card){
-    ESP_LOGI(TAG, "Initilizing SD Card");
+int GUBMountSDCard(const char* basePath){
+    ESP_LOGI(TAG, "Initializing SD Card");
+
+    if(gubState.sdCardState == SD_READY){
+        return ESP_OK;
+    }
 
     esp_err_t ret;
     esp_vfs_fat_mount_config_t mountConfig = {
@@ -183,33 +195,17 @@ int GUBMountSDCard(const char* basePath, sdmmc_card_t *card){
         .max_files = MAX_FILE_HANDLERS,
         .allocation_unit_size = 0
     };
-
-    ESP_LOGI(TAG, "Initializing SPI peripheral");
-
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
     host.slot = SD_SPI_HOST;
-    spi_bus_config_t busCFG = {
-        .mosi_io_num = PIN_NUM_SD_MOSI,
-        .miso_io_num = PIN_NUM_SD_MISO,
-        .sclk_io_num = PIN_NUM_SD_CLK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .max_transfer_sz = 4096,
-    };
 
-    ret = spi_bus_initialize(host.slot, &busCFG, SDSPI_DEFAULT_DMA);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize bus.");
-        return ret;
-    }
+    gubState.sdCardState = SD_NOT_MOUNTED;
 
-    // This initializes the slot without card detect (CD) and write protect (WP) signals.
-    // Modify slot_config.gpio_cd and slot_config.gpio_wp if your board has these signals.
+    //initialize the SDCard slot
     sdspi_device_config_t slotConfig = SDSPI_DEVICE_CONFIG_DEFAULT();
     slotConfig.gpio_cs = PIN_NUM_SD_CS;
-    slotConfig.host_id = host.slot;
+    slotConfig.host_id = SD_SPI_HOST;
     slotConfig.gpio_cd = PIN_NUM_SD_CD;
-    ret = esp_vfs_fat_sdspi_mount(basePath, &host, &slotConfig, &mountConfig, &card);
+    ret = esp_vfs_fat_sdspi_mount(basePath, &host, &slotConfig, &mountConfig, &gubState.SDcard);
 
     if (ret != ESP_OK){
         if (ret == ESP_FAIL) {
@@ -223,9 +219,28 @@ int GUBMountSDCard(const char* basePath, sdmmc_card_t *card){
     }
 
     ESP_LOGI(TAG, "SD card initialized");
-    sdmmc_card_print_info(stdout, card);
+    // sdmmc_card_print_info(stdout, card);
+    gubState.sdCardState = SD_READY;
 
     return ESP_OK;
+}
+
+int checkSDCardStatus(){
+    if(gubState.sdCardState != SD_READY)
+        return ESP_FAIL;
+
+    if(esp_timer_get_time() - gubState.lastSDCheck > SD_CARD_STATUS_CHECK_INTERVAL){
+        gubState.lastSDCheck = esp_timer_get_time();
+        esp_err_t ret = sdmmc_get_status(gubState.SDcard);
+        if(ret != ESP_OK){
+            gubState.sdCardState = SD_NOT_MOUNTED;
+            esp_vfs_fat_sdcard_unmount(SD_CARD_BASE_PATH,gubState.SDcard);
+        }
+
+        return ret;
+    }
+
+    return 0;
 }
 
 int listDir(const char *base_path){

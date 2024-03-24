@@ -19,8 +19,8 @@
 */
 enum SDCardState {
     SD_NOT_CONNECTED = 0,
-    SD_READY,
     SD_NOT_MOUNTED,
+    SD_READY,
 };
 
 enum GUBSystemEvents{
@@ -34,23 +34,27 @@ enum GUBSystemEvents{
 */
 typedef struct
 {   
+    EventGroupHandle_t gubEvents;
+    TaskHandle_t mainTaskHandler;
+    sdmmc_card_t *SDcard;
 #ifdef LED_IS_NEOPIXEL
     led_strip_handle_t ledStrip; 
 #endif
+    //heartbeat
     uint8_t ledState;
-    uint8_t sdCardState;
     uint64_t lastHeartbeat;
+
     uint64_t lastSDCheck;
-    bool SDconnected;
-    EventGroupHandle_t gubEvents;
+    uint64_t lastMountAttempt;
+    uint8_t sdCardState;
+    
 } GUBState_t;
 
-static const char* SDcardBasePath = "/data";
-static const char* canLogPath = "/data/CANLogs";
+static const char* SD_CARD_BASE_PATH = SD_CARD_MOUNT_PATH;
 
 // GUB Setup 
 void GUBInit();
-void GUBStart();
+// void GUBStart();
 void GUBloop(void *pvParam);
 
 void GUBInitLED();
@@ -58,7 +62,8 @@ void GUBToggleLED();
 void GUBHeartbeatUpdate();
 
 // Key Methods
-int GUBMountSDCard(const char* basePath, sdmmc_card_t *card);
+int GUBMountSDCard(const char* basePath);
+int checkSDCardStatus();
 
 // Debug
 void printGUBStatus();
