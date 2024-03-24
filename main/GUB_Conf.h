@@ -13,8 +13,13 @@
 // #define PIN_NUM_CAN_MISO    13
 // #define PIN_NUM_CAN_MOSI    11
 // #define PIN_NUM_CAN_CLK     12
-// #define PIN_NUM_CAN_CS      10
-// #define PIN_NUM_CAN_RX_INT  17
+// #define PIN_NUM_CAN1_CS      10
+// #define PIN_NUM_CAN1_RX_INT  17
+// #define PIN_NUM_CAN1_STB     16
+
+// #define PIN_NUM_CAN1_CS      14
+// #define PIN_NUM_CAN1_RX_INT  5
+// #define PIN_NUM_CAN1_STB     4
 
 /**
  * CAN configuration defines
@@ -51,6 +56,8 @@
 */
 
 #define MAX_FILE_HANDLERS   5
+#define MAX_LOG_SIZE        1000
+#define FLUSH_LOG_INTERVAL  10000
 
 /**
  * Generic IO pin defines
@@ -62,7 +69,6 @@
 // #define LED_IS_NEOPIXEL     0
 
 #define HEARTBEAT_PERIOD    100 * 1000 //500ms
-
 
 
 /**
@@ -79,3 +85,10 @@
 #define ESP_WIFI_SSID "GUB2AP" //CONFIG_ESP_WIFI_SSID
 #define ESP_WIFI_PASS "test1234"// CONFIG_ESP_WIFI_PASSWORD
 #define MAX_STA_CONN  4 //CONFIG_ESP_MAX_STA_CONN
+
+
+/**
+ * Task Priorites
+*/
+
+#define DEFAULT_TASK_PRIORITY 5

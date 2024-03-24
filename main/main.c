@@ -191,12 +191,6 @@ exit:    //Common return path
     return ret;
 }
 
-void installGPIOISRService(void *arg){
-    // Forces the isr_core_id in the gpio_context to core 1. This is a hack.
-    gpio_intr_enable(PIN_NUM_CAN1_RX_INT);
-    gpio_intr_disable(PIN_NUM_CAN1_RX_INT);
-}
-
 #define MCP251863_FIFO_COUNT    2
 
 void app_main(void)
@@ -229,15 +223,6 @@ void app_main(void)
     // print_real_time_stats(pdMS_TO_TICKS(1000), false);
     
     // vTaskDelay(pdMS_TO_TICKS(1000));
-
-    // Install GPIO service on Core 1, all gpio isr handlers will be processed on core 1.
-    gpio_install_isr_service(0);
-    esp_ipc_call_blocking(1, installGPIOISRService, 0);
-    
-    ESP_LOGD(TAG, "Starting CAN.");
-    // CAN bus driver setup. Don't want to miss anything so do this first!
-    CANDriverInit();
-    CANDriverAddBus(0, PIN_NUM_CAN1_CS, PIN_NUM_CAN1_RX_INT, PIN_NUM_CAN1_STB);
     
     // ESP_ERROR_CHECK(spi_bus_add_device(CANSPI_HOST, &devcfgCAN, &spi));
     ESP_LOGD(TAG, "Starting GUB control.");

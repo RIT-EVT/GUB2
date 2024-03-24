@@ -2,10 +2,14 @@
 #define GUB2_H
 
 #include <stdint.h>
+
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/event_groups.h>
+
 #include "led_strip.h"
 #include "GUB_Conf.h"
-#include "GUB_conf.h"
-#include "freertos/task.h"
+
 #include "sdmmc_cmd.h"
 
 #define GUB_STACK_SIZE 4096
@@ -17,7 +21,12 @@ enum SDCardState {
     SD_NOT_CONNECTED = 0,
     SD_READY,
     SD_NOT_MOUNTED,
+};
 
+enum GUBSystemEvents{
+    SD_CONNECT_EVENT    = 0x01,
+    SD_DISCONNECT_EVENT = 0x02,
+    CAN_EVENT           = 0x04,
 };
 
 /**
@@ -33,6 +42,7 @@ typedef struct
     uint64_t lastHeartbeat;
     uint64_t lastSDCheck;
     bool SDconnected;
+    EventGroupHandle_t gubEvents;
 } GUBState_t;
 
 // esp_event_loop_handle_t GUBEventLoop;

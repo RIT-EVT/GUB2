@@ -1,8 +1,13 @@
+#ESP-IDF Generated Files
 build/
+managed_components/
 sdkconfig
 sdkconfig.old
-managed_components/
+debug.log
 
+#vscode Files
 .vscode/
 
+#debugging files
 *.trace
+esp-idf-vscode-generated.gdb

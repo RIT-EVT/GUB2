@@ -12,12 +12,12 @@
 
 //temp
 #include "drivers/CANDriver.h"
-#include "FileLogger.h"
+#include "CANLogger.h"
 
 static const char *TAG = "GUB2";
 
 //GUB State
-GUBState_t GUBState;
+GUBState_t gubState;
 
 //GUB main loop task, staticly allocated on the stack 
 // static StackType_t GUBThreadStack[GUB_STACK_SIZE + 1];
@@ -29,17 +29,38 @@ TaskHandle_t xGUBTask;
 sdmmc_card_t SDcard;
 
 /**
+ * A function for installing the GPIO ISR on a specific core.
+*/
+void installGPIOISRService(void *arg){
+    // Forces the isr_core_id in the gpio_context to core 1. This is a hack.
+    gpio_intr_enable(PIN_NUM_CAN1_RX_INT);
+    gpio_intr_disable(PIN_NUM_CAN1_RX_INT);
+}
+
+/**
  * Setup the main GUB Control interface
 */
 void GUBInit(){
+    gubState.gubEvents = xEventGroupCreate();
+
+    // Install GPIO service on Core 1, all gpio isr handlers will be processed on core 1.
+    esp_ipc_call_blocking(1, installGPIOISRService, 0);
+    gpio_install_isr_service(0);
+    
+    ESP_LOGD(TAG, "Starting CAN.");
+    // CAN bus driver setup. Don't want to miss anything so do this first!
+    CANDriverInit(gubState.gubEvents, CAN_EVENT);
+    CANDriverAddBus(0, PIN_NUM_CAN1_CS, PIN_NUM_CAN1_RX_INT, PIN_NUM_CAN1_STB);
+
     GUBInitLED();
+    // GUBInitSDCard();
     int r = GUBMountSDCard(SDcardBasePath, &SDcard);
     ESP_LOGI("SD_CARD", "SD card initialized with status %d", r);
     if(!r){
         sdmmc_card_print_info(stdout, &SDcard);
     }
     
-    fileLoggerInit();
+    canLoggerInit();
 
     listDir(SDcardBasePath);
     listDir(canLogPath);
@@ -69,12 +90,18 @@ void GUBStart(){
  * Main loop for GUB task
 */
 void GUBloop(void *pvParam){
+    uint32_t lastPrint = esp_timer_get_time();
     while (true)
     {
         GUBHeartbeatUpdate();
         CANDriverUpdate();
+
+        if(esp_timer_get_time() - lastPrint > 1000000){
+            ESP_LOGD(TAG, "Unused Stack: %lu", uxTaskGetStackHighWaterMark2(xGUBTask));
+            lastPrint = esp_timer_get_time();
+        }
         
-        fileLoggerUpdate();
+        canLoggerUpdate();
         vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
@@ -83,7 +110,7 @@ void GUBloop(void *pvParam){
  * Setup the heartbeat led
 */
 void GUBInitLED(){
-    GUBState.lastHeartbeat = 0;
+    gubState.lastHeartbeat = 0;
     #if LED_IS_NEOPIXEL==1
     ESP_LOGI(TAG, "Heartbeat with RGB");
     led_strip_config_t strip_config = {
@@ -93,9 +120,9 @@ void GUBInitLED(){
     led_strip_rmt_config_t rmt_config = {
         .resolution_hz = 10 * 1000 * 1000, // 10MHz
     };
-    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &GUBState.ledStrip));
+    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &gubState.ledStrip));
     /* Set all LED off to clear all pixels */
-    led_strip_clear(GUBState.ledStrip);
+    led_strip_clear(gubState.ledStrip);
 
     #else
     ESP_LOGI(TAG, "Heartbeat with GPIO");
@@ -108,29 +135,29 @@ void GUBInitLED(){
 void GUBToggleLED(){
     #if LED_IS_NEOPIXEL==1
     /* If the addressable LED is enabled */
-    if (GUBState.ledState) {
+    if (gubState.ledState) {
         /* Set the LED pixel using RGB from 0 (0%) to 255 (100%) for each color */
-        led_strip_set_pixel(GUBState.ledStrip, 0, 0, 16, 0);
+        led_strip_set_pixel(gubState.ledStrip, 0, 0, 16, 0);
         /* Refresh the strip to send data */
-        led_strip_refresh(GUBState.ledStrip);
+        led_strip_refresh(gubState.ledStrip);
     } else {
         /* Set all LED off to clear all pixels */
-        led_strip_clear(GUBState.ledStrip);
+        led_strip_clear(gubState.ledStrip);
     }
     #else
 
-    gpio_set_level(PIN_NUM_HEARTBEAT, GUBState.ledState);
+    gpio_set_level(PIN_NUM_HEARTBEAT, gubState.ledState);
     #endif
     
-    GUBState.ledState = !GUBState.ledState;
+    gubState.ledState = !gubState.ledState;
 }
 
 /**
  * Update heartbeat led
 */
 void GUBHeartbeatUpdate(){
-    if(esp_timer_get_time() - GUBState.lastHeartbeat > HEARTBEAT_PERIOD){
-        GUBState.lastHeartbeat = esp_timer_get_time();
+    if(esp_timer_get_time() - gubState.lastHeartbeat > HEARTBEAT_PERIOD){
+        gubState.lastHeartbeat = esp_timer_get_time();
         GUBToggleLED();
     }
 }
