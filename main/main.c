@@ -46,48 +46,20 @@ void reduceLogging(){
     esp_log_level_set("event", ESP_LOG_INFO);
 }
 
-// int writeCanMessages(FILE *f, RingbufHandle_t buffer){
-
-//     if(getNumItemsInQueue(buffer) < 10) return 0;
-//     if(f == NULL) return -1;
-
-//     int count = 0;
-//     size_t itemSize;
-//     MCP251XFD_CANMessage *receivedMessage;
-//     while((receivedMessage = (MCP251XFD_CANMessage*)xRingbufferReceive(buffer, &itemSize, pdMS_TO_TICKS(100))) != NULL){
-//         fwrite(receivedMessage, sizeof(MCP251XFD_CANMessage), 1, f);
-//         fwrite(receivedMessage->PayloadData, sizeof(uint8_t), receivedMessage->DLC, f);
-//         fputs("\n", f); 
-//         count++;
-//         free(receivedMessage->PayloadData);
-//         vRingbufferReturnItem(buffer, (void*) receivedMessage);
-//     }
-//     ESP_LOGI("SDWrite", "Writing messages to SD card; %d wrote", count);
-//     fflush(f);
-//     fsync(fileno(f));
-//     return 1;
-// }
-
-// int writeMessage(FILE *f, MCP251XFD_CANMessage *receivedMessage){
-//     if(f != NULL){
-//         fwrite(receivedMessage, sizeof(MCP251XFD_CANMessage), 1, f);
-//         fwrite(receivedMessage->PayloadData, sizeof(uint8_t), receivedMessage->DLC, f);
-//         fputs("\n", f);
-//         return 0;
-//     }
-//     return -1;
-// }
-
 #define ARRAY_SIZE_OFFSET   2   //Increase this if print_real_time_stats returns ESP_ERR_INVALID_SIZE
 
+// Simple comparison of task numbers for sorting
 int compareTaskNumber (const void * a, const void * b) {
     return ( ((TaskStatus_t*)a)->xTaskNumber - ((TaskStatus_t*)b)->xTaskNumber );
 };
 
-static esp_err_t print_real_time_stats(TickType_t xTicksToWait, bool showHeap) {
-    TaskStatus_t *start_array = NULL, *end_array = NULL;
-    UBaseType_t start_array_size, end_array_size;
-    uint32_t start_run_time, end_run_time;
+/**
+ * Prints out task statistics in a top type format
+*/
+static esp_err_t printTaskStats(TickType_t xTicksToWait, bool showHeap) {
+    TaskStatus_t *startArray = NULL, *endArray = NULL;
+    UBaseType_t startArraySize, endArraySize;
+    uint32_t startRunTime, endRunTime;
     esp_err_t ret;
 
     char *stateArray[7] = {
@@ -101,15 +73,15 @@ static esp_err_t print_real_time_stats(TickType_t xTicksToWait, bool showHeap) {
     };
 
     //Allocate array to store current task states
-    start_array_size = uxTaskGetNumberOfTasks() + ARRAY_SIZE_OFFSET;
-    start_array = malloc(sizeof(TaskStatus_t) * start_array_size);
-    if (start_array == NULL) {
+    startArraySize = uxTaskGetNumberOfTasks() + ARRAY_SIZE_OFFSET;
+    startArray = malloc(sizeof(TaskStatus_t) * startArraySize);
+    if (startArray == NULL) {
         ret = ESP_ERR_NO_MEM;
         goto exit;
     }
     //Get current task states
-    start_array_size = uxTaskGetSystemState(start_array, start_array_size, &start_run_time);
-    if (start_array_size == 0) {
+    startArraySize = uxTaskGetSystemState(startArray, startArraySize, &startRunTime);
+    if (startArraySize == 0) {
         ret = ESP_ERR_INVALID_SIZE;
         goto exit;
     }
@@ -117,77 +89,76 @@ static esp_err_t print_real_time_stats(TickType_t xTicksToWait, bool showHeap) {
     vTaskDelay(xTicksToWait);
 
     //Allocate array to store tasks states post delay
-    end_array_size = uxTaskGetNumberOfTasks() + ARRAY_SIZE_OFFSET;
-    end_array = malloc(sizeof(TaskStatus_t) * end_array_size);
-    if (end_array == NULL) {
+    endArraySize = uxTaskGetNumberOfTasks() + ARRAY_SIZE_OFFSET;
+    endArray = malloc(sizeof(TaskStatus_t) * endArraySize);
+    if (endArray == NULL) {
         ret = ESP_ERR_NO_MEM;
         goto exit;
     }
     //Get post delay task states
-    end_array_size = uxTaskGetSystemState(end_array, end_array_size, &end_run_time);
-    if (end_array_size == 0) {
+    endArraySize = uxTaskGetSystemState(endArray, endArraySize, &endRunTime);
+    if (endArraySize == 0) {
         ret = ESP_ERR_INVALID_SIZE;
         goto exit;
     }
 
-    //Calculate total_elapsed_time in units of run time stats clock period.
-    uint32_t total_elapsed_time = (end_run_time - start_run_time);
-    if (total_elapsed_time == 0) {
+    //Calculate totalElapsedTime in units of run time stats clock period.
+    uint32_t totalElapsedTime = (endRunTime - startRunTime);
+    if (totalElapsedTime == 0) {
         ret = ESP_ERR_INVALID_STATE;
         goto exit;
     }
 
     //sort start array
-    qsort (start_array, start_array_size, sizeof(TaskStatus_t), compareTaskNumber);
+    qsort (startArray, startArraySize, sizeof(TaskStatus_t), compareTaskNumber);
 
     //print heap info
-    // printf("\x1B[%dA\x1B[0J==============================================================\n", start_array_size+15);
     if(showHeap){
         printf("==============================================================\n");
         heap_caps_print_heap_info(MALLOC_CAP_DEFAULT);
     }
     printf("==============================================================\n");
     printf("| ## |    Task    | Core | Run Time | Percentage |   state   |\n");
-    //Match each task in start_array to those in the end_array
-    for (int i = 0; i < start_array_size; i++) {
+    //Match each task in startArray to those in the endArray
+    for (int i = 0; i < startArraySize; i++) {
         int k = -1;
-        for (int j = 0; j < end_array_size; j++) {
-            if (start_array[i].xHandle == end_array[j].xHandle) {
+        for (int j = 0; j < endArraySize; j++) {
+            if (startArray[i].xHandle == endArray[j].xHandle) {
                 k = j;
                 //Mark that task have been matched by overwriting their handles
-                start_array[i].xHandle = NULL;
-                end_array[j].xHandle = NULL;
+                startArray[i].xHandle = NULL;
+                endArray[j].xHandle = NULL;
                 break;
             }
         }
 
-        eTaskState taskState = start_array[i].eCurrentState;
-        int coreID = start_array[i].xCoreID == tskNO_AFFINITY ? -1 : start_array[i].xCoreID;
+        eTaskState taskState = startArray[i].eCurrentState;
+        int coreID = startArray[i].xCoreID == tskNO_AFFINITY ? -1 : startArray[i].xCoreID;
 
         //Check if matching task found
         if (k >= 0) {
-            uint32_t task_elapsed_time = end_array[k].ulRunTimeCounter - start_array[i].ulRunTimeCounter;
-            uint32_t percentage_time = (task_elapsed_time * 100UL) / (total_elapsed_time * portNUM_PROCESSORS);
-            printf("| %2u | %10s | %4d | %8"PRIu32" | %9"PRIu32"%% | %s |\n", start_array[i].xTaskNumber,
-                start_array[i].pcTaskName, coreID, task_elapsed_time, percentage_time, stateArray[taskState < 7 ? taskState : 6]);
+            uint32_t taskElapsedTime = endArray[k].ulRunTimeCounter - startArray[i].ulRunTimeCounter;
+            uint32_t percentageTime = (taskElapsedTime * 100UL) / (totalElapsedTime * portNUM_PROCESSORS);
+            printf("| %2u | %10s | %4d | %8"PRIu32" | %9"PRIu32"%% | %s |\n", startArray[i].xTaskNumber,
+                startArray[i].pcTaskName, coreID, taskElapsedTime, percentageTime, stateArray[taskState < 7 ? taskState : 6]);
 
-        } else if (start_array[i].xHandle != NULL) { //Print unmatched tasks: Deleted
-            printf("| %2u | %10s | %4d |   NONE   |    NONE    | %s |\n", start_array[i].xTaskNumber,
-                start_array[i].pcTaskName, coreID, "DELETED  ");
+        } else if (startArray[i].xHandle != NULL) { //Print unmatched tasks: Deleted
+            printf("| %2u | %10s | %4d |   NONE   |    NONE    | %s |\n", startArray[i].xTaskNumber,
+                startArray[i].pcTaskName, coreID, "DELETED  ");
         }
     }
 
-    for (int i = 0; i < end_array_size; i++) {
-        if (end_array[i].xHandle != NULL) {
-            printf("| %s | Created\n", end_array[i].pcTaskName);
+    for (int i = 0; i < endArraySize; i++) {
+        if (endArray[i].xHandle != NULL) {
+            printf("| %s | Created\n", endArray[i].pcTaskName);
         }
     }
     printf("==============================================================\n");
     ret = ESP_OK;
 
 exit:    //Common return path
-    free(start_array);
-    free(end_array);
+    free(startArray);
+    free(endArray);
     return ret;
 }
 
@@ -219,32 +190,12 @@ void app_main(void)
     };
 
     ESP_ERROR_CHECK(spi_bus_initialize(CAN_SPI_HOST, &buscfg, SPI_DMA_CH_AUTO));
-
-    // print_real_time_stats(pdMS_TO_TICKS(1000), false);
     
     // vTaskDelay(pdMS_TO_TICKS(1000));
     
-    // ESP_ERROR_CHECK(spi_bus_add_device(CANSPI_HOST, &devcfgCAN, &spi));
     ESP_LOGD(TAG, "Starting GUB control.");
     
     GUBInit();
-
-    // int r = mountSDCard(base_path, &card);
-    // ESP_LOGI("SD_CARD", "SD card initialized with status %d", r);
-    // if(!r){
-    //     sdmmc_card_print_info(stdout, &card);
-    // }
-    
-    // listDir(base_path);
-    // listDir(canLogPath);
-
-    // ESP_LOGI("Main Loop","transmit result: %d", transmitCount(&MCP251863_CAN1, 1));
-
-    // char pathBuf[100];
-    struct stat st;
-    if (stat(canLogPath, &st) == -1) {
-        mkdir(canLogPath, 0777);
-    }
 
     //############################################
     //#####             WiFi                ######
@@ -255,8 +206,6 @@ void app_main(void)
 
     wifi_init_softap();
 
-    
-
     //Start File server
     start_file_server(SDcardBasePath);
 
@@ -265,9 +214,14 @@ void app_main(void)
     //main loop, not much here since most stuff is handled through the GUB task that can leverage both cores
     while (1)
     {
-        // printf("------------------------------\r\n");
-        print_real_time_stats(pdMS_TO_TICKS(1000), false);
-
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        
+        // Print Task information if debugging
+        if(LOG_LOCAL_LEVEL == ESP_LOG_DEBUG){
+            printTaskStats(pdMS_TO_TICKS(1000), false);
+            //print GUB Stats
+            printGUBStatus();
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
     }
 }

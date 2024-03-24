@@ -90,16 +90,16 @@ void GUBStart(){
  * Main loop for GUB task
 */
 void GUBloop(void *pvParam){
-    uint32_t lastPrint = esp_timer_get_time();
+    // uint32_t lastPrint = esp_timer_get_time();
     while (true)
     {
         GUBHeartbeatUpdate();
         CANDriverUpdate();
 
-        if(esp_timer_get_time() - lastPrint > 1000000){
-            ESP_LOGD(TAG, "Unused Stack: %lu", uxTaskGetStackHighWaterMark2(xGUBTask));
-            lastPrint = esp_timer_get_time();
-        }
+        // if(esp_timer_get_time() - lastPrint > 1000000){
+        //     ESP_LOGD(TAG, "Unused Stack: %lu", uxTaskGetStackHighWaterMark2(xGUBTask));
+        //     lastPrint = esp_timer_get_time();
+        // }
         
         canLoggerUpdate();
         vTaskDelay(pdMS_TO_TICKS(5));
@@ -160,6 +160,11 @@ void GUBHeartbeatUpdate(){
         gubState.lastHeartbeat = esp_timer_get_time();
         GUBToggleLED();
     }
+}
+
+void printGUBStatus(){
+    printf("CAN Driver Status:\r\n\tUnused Stack %lu\r\n", uxTaskGetStackHighWaterMark2(driver.driverTaskHandler));
+    printCANDriverState();
 }
 
 /*****************************************

@@ -45,11 +45,10 @@ typedef struct
     EventGroupHandle_t gubEvents;
 } GUBState_t;
 
-// esp_event_loop_handle_t GUBEventLoop;
-
 static const char* SDcardBasePath = "/data";
 static const char* canLogPath = "/data/CANLogs";
 
+// GUB Setup 
 void GUBInit();
 void GUBStart();
 void GUBloop(void *pvParam);
@@ -58,7 +57,11 @@ void GUBInitLED();
 void GUBToggleLED();
 void GUBHeartbeatUpdate();
 
+// Key Methods
 int GUBMountSDCard(const char* basePath, sdmmc_card_t *card);
+
+// Debug
+void printGUBStatus();
 int listDir(const char *base_path);
 
 #endif //GUB2H

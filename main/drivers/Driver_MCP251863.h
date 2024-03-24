@@ -62,6 +62,10 @@ eERRORRESULT MCP251863DeviceTransfer(void *pIntDev, uint8_t chipSelect, uint8_t 
 uint32_t MCP251863DeviceGetCurrentms(void);
 uint16_t MCP251863DeviceComputeCRC16(const uint8_t* data, size_t size);
 
+//Additional Methods
+eERRORRESULT MCP251863SetFIFOStatus(MCP251XFD *pComp, eMCP251XFD_FIFO name, setMCP251XFD_FIFOstatus statusFlags);
+eERRORRESULT MCP251863ClearFIFOOverflowFlag(MCP251XFD *pComp, eMCP251XFD_FIFO name);
+
 // void GetAndShowMCP251XFD_SFRreg(MCP251XFD *pComp);
 // void GetAndShowMCP251XFD_CANSFRreg(MCP251XFD *pComp);
 // void GetAndShowMCP251XFD_FIFOreg(MCP251XFD *pComp);

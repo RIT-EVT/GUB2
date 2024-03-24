@@ -12,19 +12,21 @@ static const char *TAG = "CANDriver";
 
 /**
  * The ISR handler for the INT1 pin of device triggered on rising edge
+ * @param arg The can bus number
 */
 void IRAM_ATTR CANDriverISRHandler(void *arg) { 
-    uint32_t dev = (uint32_t) arg;
+    uint32_t bus = (uint32_t) arg;
 
     // set the corrsponding event to chip with data (this basically defers 
     // the SPI reading to a later time that is not in an interrupt). 
-    xEventGroupSetBitsFromISR(driver.messageEvents, 1 << dev, pdTRUE);
+    xEventGroupSetBitsFromISR(driver.messageEvents, 1 << bus, pdTRUE);
 }
 
 /**
  * The FreeRTOS task for reading 
+ * @param arg UNUSED (part to FreeRTOS spec)
 */
-static void CANDriverTask(void * arg){
+static void CANDriverTask(void *arg){
     EventBits_t activeEvents = 0;
 
     //wait until the mask has atleast on bit set
@@ -82,7 +84,7 @@ static void CANDriverTask(void * arg){
             if (ErrorExt1 != ERR_OK)
             {   
                 xSemaphoreTake(dev->statsMutex, portMAX_DELAY);
-                dev->stats.fifoErrorCount++;
+                dev->stats.communicationErrorCount++;
                 xSemaphoreGive(dev->statsMutex);
                 continue;
             }
@@ -95,7 +97,12 @@ static void CANDriverTask(void * arg){
             
             //? Is there a slim possibility of deadlock? Possibly need to be very careful when stats and messages are read.
             xSemaphoreTake(dev->statsMutex, portMAX_DELAY);
-            if(!xQueueSend(driver.messageBuffer, &receivedMessage, 1)) {
+            if(FIFOstatus & MCP251XFD_RX_FIFO_OVERFLOW){
+                dev->stats.fifoErrorCount++;
+                MCP251863ClearFIFOOverflowFlag(&dev->mcp251863, MCP251XFD_FIFO1);
+            }
+
+            if(!xQueueSend(driver.messageBuffer, &receivedMessage, pdMS_TO_TICKS(1))) {
                 
                 dev->stats.receiveBufferFullCount++;
                 xSemaphoreGive(dev->statsMutex);
@@ -103,17 +110,25 @@ static void CANDriverTask(void * arg){
             }
             dev->stats.messageReceiveCount++;
             xSemaphoreGive(dev->statsMutex);
+
+            xEventGroupSetBits(driver.globalEvents, driver.messageFlag);
         }
     }
 }
 
-void CANDriverInit(EventGroupHandle_t globalEvents, uint16_t eventFlag){
+/**
+ * Driver initialization.
+ * @param globalEvents EventGroupHandle for main GUB component for notifying CAN events
+ * @param eventFlag the flags to set on a new message
+*/
+void CANDriverInit(EventGroupHandle_t globalEvents, uint16_t messageFlag){
     //setup message queue
     driver.messageBuffer = xQueueCreate(CAN_BUFFER_SIZE, sizeof(CANMessage_t));
     driver.messageEvents = xEventGroupCreate();
     driver.globalEvents = globalEvents;
-    driver.eventFlag = eventFlag;
+    driver.messageFlag = messageFlag;
 
+    // Initialize device structs
     CANDevice_t *dev;
     for(int i = 0; i < CAN_BUS_COUNT; i++){
         dev = &driver.devices[i];
@@ -124,6 +139,13 @@ void CANDriverInit(EventGroupHandle_t globalEvents, uint16_t eventFlag){
     xTaskCreatePinnedToCore(CANDriverTask, "CANDriver", CAN_STACK_SIZE, NULL, DEFAULT_TASK_PRIORITY, &driver.driverTaskHandler, 1);
 }
 
+/**
+ * Add a new CAN bus chip to the driver
+ * @param bus the bus number, must be unique to each chip and at max CAN_BUS_COUNT
+ * @param csPin The pin nCS of the MCP251863
+ * @param interruptPin The nINT1 pin of the MCP251863
+ * @param standbyPin The STBY pin of the MCP251863 (optional, set -1 to ignore)
+*/
 int CANDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
     if(bus >= CAN_BUS_COUNT) return -1;
 
@@ -145,7 +167,7 @@ int CANDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
     MCP251XFD_FIFO MCP251863_CAN_FIFO_Conf[CAN_FIFO_COUNT] = {
         { 
             .Name = MCP251XFD_FIFO1, 
-            .Size = MCP251XFD_FIFO_16_MESSAGE_DEEP, 
+            .Size = MCP251XFD_FIFO_32_MESSAGE_DEEP, 
             .Payload = CAN_RX_PAYLOAD,
             .Direction = MCP251XFD_RECEIVE_FIFO, 
             .ControlFlags = MCP251XFD_FIFO_NO_TIMESTAMP_ON_RX,
@@ -165,9 +187,6 @@ int CANDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
         },
     };
 
-    eERRORRESULT ret;
-    ret = MCP251863DeviceSetup(&dev->mcp251863, &MCP251863_CAN_conf, MCP251863_CAN_FIFO_Conf, CAN_FIFO_COUNT);
-
     // configure the interupt pin
     gpio_config_t pinConf = {};
     pinConf.mode = GPIO_MODE_INPUT;
@@ -177,7 +196,7 @@ int CANDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
     pinConf.pin_bit_mask = (1ULL << interruptPin);
     gpio_config(&pinConf);
 
-     //Configure standby pin
+    // Configure standby pin
     if(standbyPin >= 0){
         pinConf.mode = GPIO_MODE_OUTPUT;
         pinConf.intr_type = GPIO_INTR_DISABLE;
@@ -186,42 +205,78 @@ int CANDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
         gpio_set_level(standbyPin, 0); // pull low
     }
 
+    // Set interrupt handler for the pin.
     gpio_isr_handler_add(interruptPin, CANDriverISRHandler, bus);
     gpio_intr_enable(interruptPin);
 
+    // Configure MCP251863
+    eERRORRESULT ret;
+    ret = MCP251863DeviceSetup(&dev->mcp251863, &MCP251863_CAN_conf, MCP251863_CAN_FIFO_Conf, CAN_FIFO_COUNT);
+
+    // Unmask event
     driver.deviceEventMask |= (0x1 << bus);
+    xEventGroupSetBits(driver.messageEvents, 1 << bus);
 
     return ret; 
 }
 
+/**
+ * CAN driver update method for periodic tasks, may become obsolete
+*/
 void CANDriverUpdate(){
     static uint64_t lastUpdate = 0;
-    CANDevice_t *dev = &driver.devices[0];
 
     //! TEMP Debug printing periodic message statistics
-    if(esp_timer_get_time() - lastUpdate > 1000000){
-        lastUpdate = esp_timer_get_time();
-        CANDeviceStatistic_t *stats = &dev->stats;
-        ESP_LOGI(TAG, "%sReceived %lu messages with %lu FIFO Errors and %lu Buffer Errors", stats->fifoErrorCount | stats->receiveBufferFullCount ? LOG_COLOR(LOG_COLOR_RED) : "",
-            stats->messageReceiveCount, stats->fifoErrorCount, stats->receiveBufferFullCount);
-        ESP_LOGD(TAG, "Unused Stack: %lu", uxTaskGetStackHighWaterMark2(driver.driverTaskHandler));
-        stats->messageReceiveCount = 0;
-        stats->fifoErrorCount = 0;
-        stats->receiveBufferFullCount = 0;
-    }
-     
-    // If no message return immediately 
-    // if(!CANDriverGetQueueLen()) return;
+    // if(esp_timer_get_time() - lastUpdate > 1000000){
+    //     lastUpdate = esp_timer_get_time();
+    //     CANDevice_t *dev = &driver.devices[0];
+    //     CANDeviceStatistic_t *stats = &dev->stats;
+    //     ESP_LOGI(TAG, "%sReceived %lu messages with %lu FIFO Errors and %lu Buffer Errors", stats->fifoErrorCount | stats->receiveBufferFullCount ? LOG_COLOR(LOG_COLOR_RED) : "",
+    //         stats->messageReceiveCount, stats->fifoErrorCount, stats->receiveBufferFullCount);
+    //     stats->messageReceiveCount = 0;
+    //     stats->fifoErrorCount = 0;
+    //     stats->receiveBufferFullCount = 0;
+    // }
 
-    size_t itemSize;
-    CANMessage_t receivedMessage;
-    int count = 0;
-    while(xQueueReceive(driver.messageBuffer, &receivedMessage, pdMS_TO_TICKS(5)) == pdPASS && count < 5){
-        count++;
-        // esp_event_post(CANBUS_EVENT, CAN_MESSAGE_RECIEVED, &receivedMessage, sizeof(CANMessage_t), 2);
-    }
+    // size_t itemSize;
+    // CANMessage_t receivedMessage;
+    // int count = 0;
+    // while(xQueueReceive(driver.messageBuffer, &receivedMessage, pdMS_TO_TICKS(5)) == pdPASS && count < 5){
+    //     count++;
+    //     // esp_event_post(CANBUS_EVENT, CAN_MESSAGE_RECIEVED, &receivedMessage, sizeof(CANMessage_t), 2);
+    // }
 }
 
+/**
+ * Retrieve a CAN message from the driver.
+ * @param message the CAN message received from the driver
+ * @param timeoutTicks the number of ticks to wait to retrieve a message.
+ * @returns 0 for success or error code
+*/
+int CANReceiveMessage(CANMessage_t *message, uint32_t timeoutTicks){
+    return xQueueReceive(driver.messageBuffer, &message, timeoutTicks);
+}
+
+/**
+ * Get the message statistics for a bus from the driver.
+ * @param bus the bus to retrieve the statistics for.
+ * @param stats the message statistics for the bus
+ * @param clear should the stats be cleared on read
+*/
+CANDeviceStatistic_t CANGetStatistics(int bus, bool clear){
+    CANDeviceStatistic_t busStat;
+    xSemaphoreTake(driver.devices[bus].statsMutex, portMAX_DELAY);
+    memcpy(&busStat, &driver.devices[bus].stats, sizeof(CANDeviceStatistic_t));
+    if(clear)
+        memset(&driver.devices[bus].stats, 0, sizeof(CANDeviceStatistic_t));
+    xSemaphoreGive(driver.devices[bus].statsMutex);
+    return busStat;
+}
+
+/**
+ * Prints out a CAN message.
+ * @param msg the message to print
+*/
 void printCANMessage(CANMessage_t *msg){
     printf(LOG_COLOR(LOG_COLOR_PURPLE)"Message on bus #%u ID: 0x%08" PRIx32 " with %d bytes of data: ", msg->bus, msg->ID, msg->DLC);
     for(int i=0; i<msg->DLC; i++){
@@ -230,17 +285,18 @@ void printCANMessage(CANMessage_t *msg){
     printf("\n"LOG_RESET_COLOR);
 }
 
-//unused
-void sendMessage(spi_device_handle_t spi, uint8_t data){
-    ESP_LOGD("SPI3", "Preparing to send byte");
-    spi_device_acquire_bus(spi, portMAX_DELAY);
-    spi_transaction_t t;
-    memset(&t, 0 , sizeof(t));
-    t.length = 8;
-    t.tx_buffer = &data;
-    t.user = (void*) 1;
-    ESP_LOGD("SPI3", "Transmitting");
-    assert(spi_device_polling_transmit(spi, &t) == ESP_OK);
-
-    spi_device_release_bus(spi);
+/**
+ * Debug printing of CAN Driver state
+*/
+void printCANDriverState(){
+    printf("CAN Driver Status:\r\n\tUnused Stack %lu\r\n\tBus Status:\r\n", uxTaskGetStackHighWaterMark2(driver.driverTaskHandler));
+    printf("\t| bus | MSG Cnt | FIFO ERR | BUFF ERR | COM ERR |\r\n");
+    for(int i = 0; i < CAN_BUS_COUNT; i++){
+        CANDeviceStatistic_t busStats = CANGetStatistics(i, true);
+        printf("\t| %3d | %7lu | %s%8lu"LOG_RESET_COLOR" | %s%8lu"LOG_RESET_COLOR" | %s%7lu"LOG_RESET_COLOR" |\r\n", 
+        i, busStats.messageReceiveCount, 
+        busStats.fifoErrorCount ? LOG_BOLD(LOG_COLOR_RED) : "", busStats.fifoErrorCount, 
+        busStats.receiveBufferFullCount ? LOG_BOLD(LOG_COLOR_RED) : "", busStats.receiveBufferFullCount, 
+        busStats.communicationErrorCount ? LOG_BOLD(LOG_COLOR_RED) : "", busStats.communicationErrorCount);
+    }
 }

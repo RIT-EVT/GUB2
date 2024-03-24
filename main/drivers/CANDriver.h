@@ -106,25 +106,27 @@ typedef struct
     EventGroupHandle_t messageEvents;  // Event handler for interrupts to trigger receive task
     EventGroupHandle_t globalEvents;   // Global GUB events to signal new messages are available;
     TaskHandle_t driverTaskHandler;
-    uint16_t eventFlag;
+    uint16_t messageFlag;
     uint8_t deviceEventMask;
     // CircularBuffer_t payloadBuffer;
 } CANDriver_t;
 
 static CANDriver_t driver;
 
-void CANDriverInit(EventGroupHandle_t globalEvents, uint16_t eventFlag);
+void CANDriverInit(EventGroupHandle_t globalEvents, uint16_t messageFlag);
 int CANDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin);
 
 // void CANDriverUpdate();
-int CANReceiveMessage(CANMessage_t *message);
+int CANReceiveMessage(CANMessage_t *message, uint32_t timeoutTicks);
+CANDeviceStatistic_t CANGetStatistics(int bus, bool clear);
 
-
-//! unused?
+//! obsolete?
 void CANDriverUpdate();
 
-// uint32_t CANDriverGetQueueLen();
+//debugging methods
 void printCANMessage(CANMessage_t *msg);
-void sendMessage(spi_device_handle_t spi, uint8_t data);
+void printCANDriverState();
+
+// void sendMessage(int bus, CANMessage_t msg);
 
 #endif
