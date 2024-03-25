@@ -45,6 +45,7 @@ For the GUB:
 The Freertos tick rate has been set to 1000 Hz (1ms). This is the smallest unit of delay a task can wait for!
 
 ## Future Features
+- Log CAN errors
 - Better logging file format
 - GPS Logging 
 - LoRa data broadcasts.

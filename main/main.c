@@ -158,26 +158,10 @@ void app_main(void)
 
     // Create default event loop needed by the  main app
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-
-    //setup CAN SPI bus
-    ESP_LOGD(TAG, "Setting up SPI");
-    // spi_device_handle_t spi;
     
-    spi_bus_config_t buscfg={
-        .miso_io_num=PIN_NUM_CAN_MISO,
-        .mosi_io_num=PIN_NUM_CAN_MOSI,
-        .sclk_io_num=PIN_NUM_CAN_CLK,
-        .quadwp_io_num=-1,
-        .quadhd_io_num=-1,
-        .max_transfer_sz=0
-    };
-
-    ESP_ERROR_CHECK(spi_bus_initialize(CAN_SPI_HOST, &buscfg, SPI_DMA_CH_AUTO));
+    // vTaskDelay(pdMS_TO_TICKS(1000)); //delay for a bit to give time for debugger to attach
     
-    // vTaskDelay(pdMS_TO_TICKS(1000));
-    
-    ESP_LOGD(TAG, "Starting GUB control.");
-    
+    ESP_LOGD(TAG, "Initializing GUB");
     GUBInit();
 
     //############################################
@@ -197,9 +181,8 @@ void app_main(void)
     //main loop, not much here since most stuff is handled through the GUB task that can leverage both cores
     while (1)
     {
-
         // Print Task information if debugging
-        if(LOG_LOCAL_LEVEL == ESP_LOG_DEBUG){
+        if(LOG_LOCAL_LEVEL >= ESP_LOG_DEBUG){
             printTaskStats(pdMS_TO_TICKS(1000), false);
             //print GUB Stats
             printGUBStatus();

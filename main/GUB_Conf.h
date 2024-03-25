@@ -88,10 +88,10 @@
 
 #define HEARTBEAT_PERIOD    100 * 1000 //500ms
 
-// /**
-//  * GUB Configuration defines
-// */
-// #define NUMBER_DRIVERS      3
+/**
+ * GUB Configuration defines
+*/
+
 
 /**
  * WIFI Configuration defines

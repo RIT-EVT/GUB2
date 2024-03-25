@@ -15,6 +15,8 @@
 
 static const char *TAG = "CANLogger";
 
+const char *CAN_LOG_PATH = SD_CARD_CAN_LOG_PATH;
+
 static struct CANFileStatus fileStatus;
 static char fileName[30];
 static char absPath[100];
@@ -56,6 +58,9 @@ int createBaseLogName(){
     return 0;
 }
 
+/**
+ * Write the csv file header to the first file
+*/
 int writeLogHeader(){
     if(fileStatus.CANFile == NULL) return -2;
     if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return -1;
@@ -67,6 +72,9 @@ int writeLogHeader(){
     return 0;
 }
 
+/**
+ * Initialize the CAN logger
+*/
 int canLoggerInit(){
     fileStatus.fileMutex = xSemaphoreCreateMutex();
     fileStatus.splitNumber = 0;
@@ -87,6 +95,9 @@ int canLoggerInit(){
     return 0;
 }
 
+/**
+ * Process periodic logging tasks
+*/
 int canLoggerUpdate(){
     if(fileStatus.CANFile == NULL){
         if(fileStatus.baseName == NULL){
@@ -112,6 +123,10 @@ int canLoggerUpdate(){
     return fileStatus.CANFile != NULL;
 }
 
+/**
+ * Save the received can messages to the log
+ * @param msg the message to log
+*/
 int canLoggerProcessMessage(CANMessage_t const *msg){
     if(fileStatus.CANFile == NULL) return -2;
     if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return -1;
@@ -136,6 +151,10 @@ int canLoggerProcessMessage(CANMessage_t const *msg){
     return 0;
 }
 
+/**
+ * Open a log file for writing.
+ * @param reopenFile specifies if the file should be reopened to continue writing or a new one should be made
+*/
 int canLoggerOpenFile(bool reopenFile){
     if(fileStatus.baseName == NULL) return -3;
     if(fileStatus.CANFile != NULL){
@@ -167,6 +186,9 @@ int canLoggerOpenFile(bool reopenFile){
     return 0;
 }
 
+/**
+ * Flush the internal buffers to the file.
+*/
 int canLoggerFlushFile(){
     if(fileStatus.CANFile == NULL) return -2;
     if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return -1;
@@ -180,6 +202,9 @@ int canLoggerFlushFile(){
     return 0;
 }
 
+/**
+ * Close the log file.
+*/
 int canLoggerCloseFile(){
     if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return -1;
 
@@ -191,35 +216,3 @@ int canLoggerCloseFile(){
     xSemaphoreGive(fileStatus.fileMutex);
     return 0;
 }
-
-// int writeCanMessages(FILE *f, RingbufHandle_t buffer){
-
-//     if(getNumItemsInQueue(buffer) < 10) return 0;
-//     if(f == NULL) return -1;
-
-//     int count = 0;
-//     size_t itemSize;
-//     MCP251XFD_CANMessage *receivedMessage;
-//     while((receivedMessage = (MCP251XFD_CANMessage*)xRingbufferReceive(buffer, &itemSize, pdMS_TO_TICKS(100))) != NULL){
-//         fwrite(receivedMessage, sizeof(MCP251XFD_CANMessage), 1, f);
-//         fwrite(receivedMessage->PayloadData, sizeof(uint8_t), receivedMessage->DLC, f);
-//         fputs("\n", f); 
-//         count++;
-//         free(receivedMessage->PayloadData);
-//         vRingbufferReturnItem(buffer, (void*) receivedMessage);
-//     }
-//     ESP_LOGI("SDWrite", "Writing messages to SD card; %d wrote", count);
-//     fflush(f);
-//     fsync(fileno(f));
-//     return 1;
-// }
-
-// int writeMessage(FILE *f, MCP251XFD_CANMessage *receivedMessage){
-//     if(f != NULL){
-//         fwrite(receivedMessage, sizeof(MCP251XFD_CANMessage), 1, f);
-//         fwrite(receivedMessage->PayloadData, sizeof(uint8_t), receivedMessage->DLC, f);
-//         fputs("\n", f);
-//         return 0;
-//     }
-//     return -1;
-// }

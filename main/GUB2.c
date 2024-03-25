@@ -34,6 +34,20 @@ void installGPIOISRService(void *arg){
 void GUBInit(){
     gubState.gubEvents = xEventGroupCreate();
 
+    //setup CAN SPI bus
+    ESP_LOGD(TAG, "Setting CAN up SPI bus");
+    
+    spi_bus_config_t canBuscfg={
+        .miso_io_num=PIN_NUM_CAN_MISO,
+        .mosi_io_num=PIN_NUM_CAN_MOSI,
+        .sclk_io_num=PIN_NUM_CAN_CLK,
+        .quadwp_io_num=-1,
+        .quadhd_io_num=-1,
+        .max_transfer_sz=0
+    };
+
+    ESP_ERROR_CHECK(spi_bus_initialize(CAN_SPI_HOST, &canBuscfg, SPI_DMA_CH_AUTO));
+
     // Install GPIO service on Core 1, all gpio isr handlers will be processed on core 1.
     esp_ipc_call_blocking(1, installGPIOISRService, 0);
     gpio_install_isr_service(0);
@@ -43,8 +57,8 @@ void GUBInit(){
     canDriverInit(gubState.gubEvents, CAN_EVENT);
     canDriverAddBus(0, PIN_NUM_CAN1_CS, PIN_NUM_CAN1_RX_INT, PIN_NUM_CAN1_STB);
     
-    ESP_LOGI(TAG, "Initializing SD Card SPI peripheral");
-    spi_bus_config_t busCFG = {
+    ESP_LOGI(TAG, "Initializing SD Card SPI bus");
+    spi_bus_config_t sdBusCFG = {
         .mosi_io_num = PIN_NUM_SD_MOSI,
         .miso_io_num = PIN_NUM_SD_MISO,
         .sclk_io_num = PIN_NUM_SD_CLK,
@@ -55,7 +69,7 @@ void GUBInit(){
     
     //initialize SPI bus
     esp_err_t ret;
-    ret = spi_bus_initialize(SD_SPI_HOST, &busCFG, SDSPI_DEFAULT_DMA);
+    ret = spi_bus_initialize(SD_SPI_HOST, &sdBusCFG, SDSPI_DEFAULT_DMA);
     if (ret == ESP_OK) {
         int r = GUBMountSDCard(SD_CARD_BASE_PATH);
         ESP_LOGI("SD_CARD", "SD card initialized with status %d", r);
@@ -67,28 +81,15 @@ void GUBInit(){
     }
 
     listDir(SD_CARD_BASE_PATH);
-    listDir(CAN_LOG_PATH);
 
+    //start up logger
     canLoggerInit();
-
-    
 
     GUBInitLED();
 
     ESP_LOGI(TAG, "GUB Setup, starting main loop");
     xTaskCreate( GUBloop, "GUB", GUB_STACK_SIZE, NULL, 2, &gubState.mainTaskHandler);
 }
-
-// /**
-//  * Start the main loop for the GUB
-// */
-// void GUBStart(){
-    
-
-//     if(xGUBTask == NULL){
-//         ESP_LOGE(TAG, "Unable to create main task!");
-//     }
-// }
 
 /**
  * Main loop for GUB task
@@ -99,7 +100,7 @@ void GUBloop(void *pvParam){
     {   
         GUBHeartbeatUpdate();
         checkSDCardStatus();
-        if(gubState.sdCardState == SD_NOT_MOUNTED && esp_timer_get_time() - gubState.lastMountAttempt > 1000000){
+        if(gubState.sdCardState == SD_NOT_MOUNTED && esp_timer_get_time() - gubState.lastMountAttempt > 1000000){ // check every second
             gubState.lastMountAttempt = esp_timer_get_time();
             ESP_LOGW(TAG, "SD card not mounted! Attempting to remount...");
             GUBMountSDCard(SD_CARD_BASE_PATH);
@@ -112,8 +113,8 @@ void GUBloop(void *pvParam){
         if(canReceiveMessage(&message, pdMS_TO_TICKS(5))){
             canLoggerProcessMessage(&message);
         }
-
         
+        //* needed if not relying to the timeout of the queue
         // vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
@@ -144,6 +145,9 @@ void GUBInitLED(){
     #endif
 }
 
+/**
+ * Toggle the state of the heartbeat LED
+*/
 void GUBToggleLED(){
     #if LED_IS_NEOPIXEL==1
     /* If the addressable LED is enabled */
@@ -174,6 +178,9 @@ void GUBHeartbeatUpdate(){
     }
 }
 
+/**
+ * print out the current status of the GUB
+*/
 void printGUBStatus(){
     printf("GUB status:\r\n\tUnused Stack %lu\r\n", uxTaskGetStackHighWaterMark2(gubState.mainTaskHandler));
     printCANDriverState();

@@ -1,8 +1,8 @@
 #ifndef CAN_LOGGER_H
 #define CAN_LOGGER_H
 
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
@@ -10,16 +10,15 @@
 #include "GUB_Conf.h"
 #include "drivers/CANDriver.h"
 
-struct CANFileStatus
-{
-    FILE* CANFile;
+struct CANFileStatus {
+    FILE *CANFile;
     SemaphoreHandle_t fileMutex;
 
     // file name information
-    char* baseName;
-    char* filePath;
+    char *baseName;
+    char *filePath;
     int splitNumber;
-    int duplicateNumber; 
+    int duplicateNumber;
 
     // stats for file control
     uint32_t totalBytesWritten;
@@ -28,16 +27,18 @@ struct CANFileStatus
     bool headerWriten;
 };
 
-static const char* CAN_LOG_PATH = SD_CARD_CAN_LOG_PATH;
+extern const char *CAN_LOG_PATH;
 
-
+// Logger setup
 int canLoggerInit();
 int canLoggerUpdate();
 
+// Message processing
 int canLoggerProcessMessage(CANMessage_t const *msg);
 
+// Log file methods
 int canLoggerOpenFile(bool reopenFile);
 int canLoggerFlushFile();
 int canLoggerCloseFile();
 
-#endif //CAN_LOGGER_H
+#endif // CAN_LOGGER_H

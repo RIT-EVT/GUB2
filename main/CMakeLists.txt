@@ -7,7 +7,6 @@ set(SOURCES
     "drivers/WIFIDriver.c" 
     "drivers/Driver_MCP251863.c" 
     "drivers/CANDriver.c"
-    "datatypes/CircularBuffer.c"
 )
 
 
