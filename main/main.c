@@ -26,6 +26,7 @@ void reduceLogging(){
     esp_log_level_set("httpd_txrx", ESP_LOG_ERROR);
     esp_log_level_set("httpd_parse", ESP_LOG_ERROR);
     esp_log_level_set("event", ESP_LOG_INFO);
+    esp_log_level_set("vfs_fat", ESP_LOG_INFO);
 }
 
 #define ARRAY_SIZE_OFFSET   2   //Increase this if print_real_time_stats returns ESP_ERR_INVALID_SIZE

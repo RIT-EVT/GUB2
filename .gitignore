@@ -10,4 +10,4 @@ debug.log
 
 #debugging files
 *.trace
-esp-idf-vscode-generated.gdb
+*.gdb

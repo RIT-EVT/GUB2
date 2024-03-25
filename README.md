@@ -45,11 +45,16 @@ For the GUB:
 The Freertos tick rate has been set to 1000 Hz (1ms). This is the smallest unit of delay a task can wait for!
 
 ## Future Features
+- Better logging file format
 - GPS Logging 
 - LoRa data broadcasts.
 
 ## Current Issues
-Many have been fixed, but SD card handling will likely cause issues. The board has been tested up to ~1200 messages per second with file writing.
+Many have been fixed, but SD card handling will likely cause issues. The code has been tested up to ~1800 messages per second while logging without loading the file list and can be pushed to ~2100 messages per second with some loss. Another issue is the SD card getting stuck into a persistent error state of 0x107. A full power cycle may fix this issue or it may just be an issue with my breadboard setup. 
+
+A future addition should be a better logging format than a csv since a CAN message with 4 bytes of data takes up 32 bytes of file space at say 1800 messages per second is 57.6 KB/s of space. 
+
+
 
 <!-- The Board, must start up in an environment of less than 76 messages per second or the board will be stuck in a boot loop until the number of messages reduces below this limit. Once booted, the board can currently handle ~1700 messages per second before file writing. -->
 

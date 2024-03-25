@@ -35,7 +35,7 @@
 #define CAN_DATA_BITRATE    1000000     /* 1   Mbps*/
 
 #define CAN_BUS_COUNT           1 
-#define CAN_BUFFER_SIZE         32      // ESP message buffer size
+#define CAN_BUFFER_SIZE         100      // ESP message buffer size
 #define CAN_MAX_MESSAGE_SIZE    8       // max can message payload size of 8 bytes used to 
                                         // preallocate memory for the payload data
 
@@ -63,8 +63,9 @@
 */
 
 #define MAX_FILE_HANDLERS               5
-#define FLUSH_LOG_INTERVAL              10000
-#define MAX_LOG_SIZE                    1000
+#define FLUSH_LOG_INTERVAL              10000 * 1000 //10 seconds
+#define FLUSH_SIZE_THRESHOLD            4 << 10  //4 KiB
+#define MAX_LOG_SIZE                    1 << 20  //1 MiB    
 #define SD_CARD_STATUS_CHECK_INTERVAL   1000 * 1000 //1 Second
 
 #define SD_CARD_MOUNT_PATH      "/data"

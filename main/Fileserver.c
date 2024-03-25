@@ -63,7 +63,7 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath)
     }
 
     /* Send HTML file header */
-    httpd_resp_sendstr_chunk(req, "<!DOCTYPE html><html><body>");
+    httpd_resp_sendstr_chunk(req, "<!DOCTYPE html><html><head><meta http-equiv=\"refresh\" content=\"5\"></head><body>");
 
     /* Send file-list table definition and column labels */
     httpd_resp_sendstr_chunk(req,
