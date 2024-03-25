@@ -31,17 +31,27 @@ git clone --recurse-submodules https://github.com/RIT-EVT/GUB2.git
 ```
 Once the repository is cloned, the project can be built in VSCode using the ESP-IDF extension and pressing the build button on the bottom status bar. The project can also be built with `cmake build` from the ESP-IDF Terminal.
 
-## Project Structure
+## Debugging
+For debugging the board you will likely have to launch openocd manually as it will often times fail. To do so open the ESP-IDF terminal and enter one of the two following commands depending on the board. 
+
+For the ESP32-S3-DevKitC-1 board or built in usb debugger: 
+`openocd -f "board/esp32s3-builtin.cfg"` \
+For the GUB:
+`openocd -s share/openocd/scripts -f interface/ftdi/esp32_devkitj_v1.cfg -f board/esp32s3-ftdi.cfg`
+
+<!-- ## Project Structure -->
 
 ## Additional notes
-The Freertos tick rate has been set to 200 Hz (5ms). This is the smallest unit of delay a task can wait for!
+The Freertos tick rate has been set to 1000 Hz (1ms). This is the smallest unit of delay a task can wait for!
 
 ## Future Features
 - GPS Logging 
 - LoRa data broadcasts.
 
 ## Current Issues
-The Board, must start up in an environment of less than 76 messages per second or the board will be stuck in a boot loop until the number of messages reduces below this limit. Once booted, the board can currently handle ~1700 messages per second before file writing.
+Many have been fixed, but SD card handling will likely cause issues. The board has been tested up to ~1200 messages per second with file writing.
+
+<!-- The Board, must start up in an environment of less than 76 messages per second or the board will be stuck in a boot loop until the number of messages reduces below this limit. Once booted, the board can currently handle ~1700 messages per second before file writing. -->
 
 <!-- ## Example folder contents -->
 

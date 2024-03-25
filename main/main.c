@@ -1,29 +1,12 @@
 // #include <stdio.h>
-// #include <stdlib.h>
-// #include <stdint.h>
-// #include <string.h>
-// #include <dirent.h>
-// #include <errno.h>
-// #include <sys/stat.h>
-// #include <sys/unistd.h>
-// #include <time.h>
 
-// //TODO Remove unneeded imports
 #include <freertos/FreeRTOS.h>
-// #include <freertos/task.h>
-// #include <freertos/ringbuf.h>
 // #include <esp_system.h>
 // #include <esp_timer.h>
 #include <esp_event.h>
 #include <driver/spi_master.h>
-// #include <driver/gpio.h>
 #include <esp_log.h>
 #include <nvs_flash.h>
-// #include <esp_mac.h>
-// #include <esp_wifi.h>
-// #include <esp_netif.h>
-// #include <lwip/inet.h>
-// #include <esp_ipc.h>
 
 #include "drivers/WIFIDriver.h"
 #include "drivers/CANDriver.h"

@@ -10,6 +10,8 @@
 
 static const char *TAG = "CANDriver";
 
+static CANDriver_t driver;
+
 /**
  * The ISR handler for the INT1 pin of device triggered on rising edge
  * @param arg The can bus number
@@ -58,7 +60,7 @@ static void CANDriverTask(void *arg){
             eMCP251XFD_FIFOstatus FIFOstatus = 0;
             ErrorExt1 = MCP251XFD_GetFIFOStatus(&dev->mcp251863, MCP251XFD_FIFO1, &FIFOstatus); // First get FIFO1 status
             if (ErrorExt1 != ERR_OK){
-                ESP_LOGE("CANRX","Error getting FIFO Status %d", ErrorExt1);
+                ESP_LOGE(TAG,"Error getting FIFO Status %d", ErrorExt1);
                 xSemaphoreTake(dev->statsMutex, portMAX_DELAY);
                 dev->stats.communicationErrorCount++;
                 xSemaphoreGive(dev->statsMutex);
@@ -121,7 +123,7 @@ static void CANDriverTask(void *arg){
  * @param globalEvents EventGroupHandle for main GUB component for notifying CAN events
  * @param eventFlag the flags to set on a new message
 */
-void CANDriverInit(EventGroupHandle_t globalEvents, uint16_t messageFlag){
+void canDriverInit(EventGroupHandle_t globalEvents, uint16_t messageFlag){
     //setup message queue
     driver.messageBuffer = xQueueCreate(CAN_BUFFER_SIZE, sizeof(CANMessage_t));
     driver.messageEvents = xEventGroupCreate();
@@ -146,7 +148,7 @@ void CANDriverInit(EventGroupHandle_t globalEvents, uint16_t messageFlag){
  * @param interruptPin The nINT1 pin of the MCP251863
  * @param standbyPin The STBY pin of the MCP251863 (optional, set -1 to ignore)
 */
-int CANDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
+int canDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
     if(bus >= CAN_BUS_COUNT) return -1;
 
     //setup device info
@@ -206,7 +208,7 @@ int CANDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
     }
 
     // Set interrupt handler for the pin.
-    gpio_isr_handler_add(interruptPin, CANDriverISRHandler, bus);
+    gpio_isr_handler_add(interruptPin, CANDriverISRHandler, (void*)bus);
     gpio_intr_enable(interruptPin);
 
     // Configure MCP251863
@@ -223,8 +225,8 @@ int CANDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
 /**
  * CAN driver update method for periodic tasks, may become obsolete
 */
-void CANDriverUpdate(){
-    static uint64_t lastUpdate = 0;
+void canDriverUpdate(){
+    // static uint64_t lastUpdate = 0;
 
     //! TEMP Debug printing periodic message statistics
     // if(esp_timer_get_time() - lastUpdate > 1000000){
@@ -253,8 +255,8 @@ void CANDriverUpdate(){
  * @param timeoutTicks the number of ticks to wait to retrieve a message.
  * @returns 0 for success or error code
 */
-int CANReceiveMessage(CANMessage_t *message, uint32_t timeoutTicks){
-    return xQueueReceive(driver.messageBuffer, &message, timeoutTicks);
+int canReceiveMessage(CANMessage_t *message, uint32_t timeoutTicks){
+    return xQueueReceive(driver.messageBuffer, message, timeoutTicks);
 }
 
 /**
@@ -263,7 +265,7 @@ int CANReceiveMessage(CANMessage_t *message, uint32_t timeoutTicks){
  * @param stats the message statistics for the bus
  * @param clear should the stats be cleared on read
 */
-CANDeviceStatistic_t CANGetStatistics(int bus, bool clear){
+CANDeviceStatistic_t canGetStatistics(int bus, bool clear){
     CANDeviceStatistic_t busStat;
     xSemaphoreTake(driver.devices[bus].statsMutex, portMAX_DELAY);
     memcpy(&busStat, &driver.devices[bus].stats, sizeof(CANDeviceStatistic_t));
@@ -277,7 +279,7 @@ CANDeviceStatistic_t CANGetStatistics(int bus, bool clear){
  * Prints out a CAN message.
  * @param msg the message to print
 */
-void printCANMessage(CANMessage_t *msg){
+void printCANMessage(CANMessage_t const *msg){
     printf(LOG_COLOR(LOG_COLOR_PURPLE)"Message on bus #%u ID: 0x%08" PRIx32 " with %d bytes of data: ", msg->bus, msg->ID, msg->DLC);
     for(int i=0; i<msg->DLC; i++){
         printf("0x%X ", msg->payload[i]);
@@ -292,7 +294,7 @@ void printCANDriverState(){
     printf("CAN Driver Status:\r\n\tUnused Stack %lu\r\n\tBus Status:\r\n", uxTaskGetStackHighWaterMark2(driver.driverTaskHandler));
     printf("\t| bus | MSG Cnt | FIFO ERR | BUFF ERR | COM ERR |\r\n");
     for(int i = 0; i < CAN_BUS_COUNT; i++){
-        CANDeviceStatistic_t busStats = CANGetStatistics(i, true);
+        CANDeviceStatistic_t busStats = canGetStatistics(i, true);
         printf("\t| %3d | %7lu | %s%8lu"LOG_RESET_COLOR" | %s%8lu"LOG_RESET_COLOR" | %s%7lu"LOG_RESET_COLOR" |\r\n", 
         i, busStats.messageReceiveCount, 
         busStats.fifoErrorCount ? LOG_BOLD(LOG_COLOR_RED) : "", busStats.fifoErrorCount, 

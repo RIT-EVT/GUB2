@@ -40,8 +40,8 @@ void GUBInit(){
     
     ESP_LOGD(TAG, "Starting CAN.");
     // CAN bus driver setup. Don't want to miss anything so do this first!
-    CANDriverInit(gubState.gubEvents, CAN_EVENT);
-    CANDriverAddBus(0, PIN_NUM_CAN1_CS, PIN_NUM_CAN1_RX_INT, PIN_NUM_CAN1_STB);
+    canDriverInit(gubState.gubEvents, CAN_EVENT);
+    canDriverAddBus(0, PIN_NUM_CAN1_CS, PIN_NUM_CAN1_RX_INT, PIN_NUM_CAN1_STB);
     
     ESP_LOGI(TAG, "Initializing SD Card SPI peripheral");
     spi_bus_config_t busCFG = {
@@ -66,12 +66,12 @@ void GUBInit(){
         ESP_LOGE(TAG, "Failed to initialize bus.");
     }
 
-    // Mount the SDCard 
-    
-    
+    listDir(SD_CARD_BASE_PATH);
+    listDir(CAN_LOG_PATH);
+
     canLoggerInit();
 
-    listDir(SD_CARD_BASE_PATH);
+    
 
     GUBInitLED();
 
@@ -105,11 +105,16 @@ void GUBloop(void *pvParam){
             GUBMountSDCard(SD_CARD_BASE_PATH);
         }
 
-        CANDriverUpdate();
+        canDriverUpdate();
         canLoggerUpdate();
+        
+        CANMessage_t message;
+        if(canReceiveMessage(&message, pdMS_TO_TICKS(5))){
+            canLoggerProcessMessage(&message);
+        }
 
         
-        vTaskDelay(pdMS_TO_TICKS(5));
+        // vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
 
@@ -170,7 +175,7 @@ void GUBHeartbeatUpdate(){
 }
 
 void printGUBStatus(){
-    printf("CAN Driver Status:\r\n\tUnused Stack %lu\r\n", uxTaskGetStackHighWaterMark2(driver.driverTaskHandler));
+    printf("GUB status:\r\n\tUnused Stack %lu\r\n", uxTaskGetStackHighWaterMark2(gubState.mainTaskHandler));
     printCANDriverState();
 }
 
