@@ -42,7 +42,7 @@ For the GUB:
 <!-- ## Project Structure -->
 
 ## Additional notes
-The Freertos tick rate has been set to 1000 Hz (1ms). This is the smallest unit of delay a task can wait for!
+The Freertos tick rate has been set to 1000 Hz (1ms). This is the smallest unit of delay a task can wait for! Current project has about a 1-2sec startup time.
 
 ## Future Features
 - Log CAN errors
