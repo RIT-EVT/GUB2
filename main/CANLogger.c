@@ -155,7 +155,7 @@ int canLoggerProcessMessage(CANMessage_t const *msg){
  * Open a log file for writing.
  * @param reopenFile specifies if the file should be reopened to continue writing or a new one should be made
 */
-int canLoggerOpenFile(bool reopenFile){
+int canLoggerOpenFile(bool append){
     if(fileStatus.baseName == NULL) return -3;
     if(fileStatus.CANFile != NULL){
         ESP_LOGW(TAG, "File already opened! Reopening");
@@ -165,7 +165,7 @@ int canLoggerOpenFile(bool reopenFile){
     if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return -1;
     snprintf(fileStatus.filePath, 100, "%s/%s-%d.csv", SD_CARD_CAN_LOG_PATH, fileStatus.baseName, fileStatus.splitNumber);
 
-    if(reopenFile){
+    if(append){
         fileStatus.CANFile = fopen(fileStatus.filePath, "a");
     } else {
         fileStatus.CANFile = fopen(fileStatus.filePath, "w");
@@ -192,7 +192,8 @@ int canLoggerOpenFile(bool reopenFile){
 int canLoggerFlushFile(){
     if(fileStatus.CANFile == NULL) return -2;
     if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return -1;
-
+    
+    // Force file writing, both sync and flush are necessary to force buffers to disk.
     fflush(fileStatus.CANFile);
     fsync(fileno(fileStatus.CANFile));
     fileStatus.lastFlushTime = esp_timer_get_time();

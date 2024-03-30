@@ -37,7 +37,7 @@ int canLoggerUpdate();
 int canLoggerProcessMessage(CANMessage_t const *msg);
 
 // Log file methods
-int canLoggerOpenFile(bool reopenFile);
+int canLoggerOpenFile(bool append);
 int canLoggerFlushFile();
 int canLoggerCloseFile();
 

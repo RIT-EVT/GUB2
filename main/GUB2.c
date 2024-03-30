@@ -21,7 +21,7 @@ GUBState_t gubState;
 
 /**
  * A function for installing the GPIO ISR on a specific core.
-*/
+ */
 void installGPIOISRService(void *arg){
     // Forces the isr_core_id in the gpio_context to core 1. This is a hack.
     gpio_intr_enable(PIN_NUM_CAN1_RX_INT);
@@ -35,7 +35,7 @@ void GUBInit(){
     gubState.gubEvents = xEventGroupCreate();
 
     //setup CAN SPI bus
-    ESP_LOGD(TAG, "Setting CAN up SPI bus");
+    ESP_LOGD(TAG, "Setting up CAN SPI bus");
     
     spi_bus_config_t canBuscfg={
         .miso_io_num=PIN_NUM_CAN_MISO,
@@ -189,7 +189,7 @@ void printGUBStatus(){
 /*****************************************
  *          SD card functions            *
  *****************************************/
-
+//TODO move SDCard handling to a separate driver. 
 /**
  * Mount the SD card
  * @param basePath the file base file path to mount the sd card to

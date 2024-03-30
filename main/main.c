@@ -145,8 +145,6 @@ exit:    //Common return path
     return ret;
 }
 
-#define MCP251863_FIFO_COUNT    2
-
 void app_main(void)
 {
     // Start of main program, reduce logging info
@@ -154,12 +152,12 @@ void app_main(void)
     ESP_LOGD(TAG, "Debug logging Enabled");
     reduceLogging();
 
-    // sys_delay_ms(10000);
-
     // Create default event loop needed by the  main app
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     
-    // vTaskDelay(pdMS_TO_TICKS(1000)); //delay for a bit to give time for debugger to attach
+    // Uncomment if the board is crashing and you are having a hard time 
+    // getting a debug session connected. 
+    // vTaskDelay(pdMS_TO_TICKS(1000));
     
     ESP_LOGD(TAG, "Initializing GUB");
     GUBInit();
@@ -175,8 +173,6 @@ void app_main(void)
 
     //Start File server
     start_file_server(SD_CARD_BASE_PATH);
-
-    // GUBStart();
 
     //main loop, not much here since most stuff is handled through the GUB task that can leverage both cores
     while (1)

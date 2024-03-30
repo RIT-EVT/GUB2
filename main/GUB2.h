@@ -63,7 +63,8 @@ void GUBInitLED();
 void GUBToggleLED();
 void GUBHeartbeatUpdate();
 
-// Key Methods
+// SDCard Methods
+//TODO move SDCard handling to a separate driver. 
 int GUBMountSDCard(const char *basePath);
 int checkSDCardStatus();
 
