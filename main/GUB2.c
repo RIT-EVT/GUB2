@@ -55,7 +55,8 @@ void GUBInit(){
     ESP_LOGD(TAG, "Starting CAN.");
     // CAN bus driver setup. Don't want to miss anything so do this first!
     canDriverInit(gubState.gubEvents, CAN_EVENT);
-    canDriverAddBus(0, PIN_NUM_CAN1_CS, PIN_NUM_CAN1_RX_INT, PIN_NUM_CAN1_STB);
+    // canDriverAddBus(0, PIN_NUM_CAN1_CS, PIN_NUM_CAN1_RX_INT, PIN_NUM_CAN1_STB);
+    canDriverAddBus(0, PIN_NUM_CAN2_CS, PIN_NUM_CAN2_RX_INT, PIN_NUM_CAN2_STB);
     
     ESP_LOGI(TAG, "Initializing SD Card SPI bus");
     spi_bus_config_t sdBusCFG = {
