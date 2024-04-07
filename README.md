@@ -14,8 +14,8 @@ The Gateway Utility Board Rev. 2 (GUB2) is responsible for recording all the CAN
 - [x] get SD card file writing with raw CAN message dumps
 - [x] get wifi ap working - maybe wifi station + AP
 - [x] simple http server for listing and reading sd card contents
+- [x] clean up code
 - [ ] generate vectorblf files for CAN logs
-- [ ] clean up code
 
 ## Build Tools Setup Steps
 > [!IMPORTANT]
@@ -31,6 +31,9 @@ git clone --recurse-submodules https://github.com/RIT-EVT/GUB2.git
 ```
 Once the repository is cloned, the project can be built in VSCode using the ESP-IDF extension and pressing the build button on the bottom status bar. The project can also be built with `cmake build` from the ESP-IDF Terminal.
 
+## Development Setup
+The GUB software was developed and tested with the ESP32-S3-DevKitC-1. This board consists of an ESP32-S3-WROOM-1 with 8 MB Flash and 512KB of SRAM along with a NEOPIXEL on pin 48. The software has only been tested with a single CAN cip, but support for multiple has been added.  
+
 ## Debugging
 For debugging the board you will likely have to launch openocd manually as it will oftentimes fail. To do so open the ESP-IDF terminal and enter one of the two following commands depending on the board. 
 
@@ -38,6 +41,7 @@ For the ESP32-S3-DevKitC-1 board or built in usb debugger:
 `openocd -f "board/esp32s3-builtin.cfg"` \
 For the GUB:
 `openocd -s share/openocd/scripts -f interface/ftdi/esp32_devkitj_v1.cfg -f board/esp32s3-ftdi.cfg`
+
 
 <!-- ## Project Structure -->
 

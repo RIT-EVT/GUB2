@@ -107,11 +107,11 @@ typedef struct {
 } CANDriver_t;
 
 //Main driver setup methods
-void canDriverInit(EventGroupHandle_t globalEvents, uint16_t messageFlag);
-int canDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin);
+void setupCANDriver(EventGroupHandle_t globalEvents, uint16_t messageFlag);
+int addCANBus(uint8_t bus, int csPin, int interruptPin, int standbyPin);
 
-int canReceiveMessage(CANMessage_t *message, uint32_t timeoutTicks);
-CANDeviceStatistic_t canGetStatistics(int bus, bool clear);
+int receiveCANMessage(CANMessage_t *message, uint32_t timeoutTicks);
+CANDeviceStatistic_t getCANStatistics(int bus, bool clear);
 
 //! obsolete?
 void canDriverUpdate();

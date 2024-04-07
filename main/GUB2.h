@@ -10,6 +10,8 @@
 
 #include "GUB_Conf.h"
 
+//The ESP32-S3-DevKitC-1 board has an onboard NEOPIXEL that is used for the heartbeat.
+//The actual board uses a normal LED and the NEOPIXEL can be removed if there is no need for the devkit.
 #if LED_IS_NEOPIXEL == 1
 #include "led_strip.h"
 #endif

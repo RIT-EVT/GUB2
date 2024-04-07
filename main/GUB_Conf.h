@@ -86,7 +86,7 @@
 // #define PIN_NUM_HEARTBEAT   2
 // #define LED_IS_NEOPIXEL     0
 
-#define HEARTBEAT_PERIOD    100 * 1000 //100ms
+#define HEARTBEAT_LED_PERIOD    100 * 1000 //100ms
 
 /**
  * GUB Configuration defines

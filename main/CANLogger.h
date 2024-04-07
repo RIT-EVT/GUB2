@@ -27,6 +27,14 @@ struct CANFileStatus {
     bool headerWriten;
 };
 
+enum LoggerError{
+    LOGGER_ERR_OK = 0,
+    LOGGER_ERR_NOT_OPEN = -1,
+    LOGGER_ERR_ILLEGAL_NAME = -2,
+    LOGGER_ERR_SEMAPHORE_TIMEOUT = -3,
+    LOGGER_ERR_BAD_PATH = -4,
+};
+
 extern const char *CAN_LOG_PATH;
 
 // Logger setup

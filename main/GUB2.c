@@ -54,8 +54,8 @@ void GUBInit(){
     
     ESP_LOGD(TAG, "Starting CAN.");
     // CAN bus driver setup. Don't want to miss anything so do this first!
-    canDriverInit(gubState.gubEvents, CAN_EVENT);
-    canDriverAddBus(0, PIN_NUM_CAN1_CS, PIN_NUM_CAN1_RX_INT, PIN_NUM_CAN1_STB);
+    setupCANDriver(gubState.gubEvents, CAN_EVENT);
+    addCANBus(0, PIN_NUM_CAN1_CS, PIN_NUM_CAN1_RX_INT, PIN_NUM_CAN1_STB);
     
     ESP_LOGI(TAG, "Initializing SD Card SPI bus");
     spi_bus_config_t sdBusCFG = {
@@ -110,7 +110,7 @@ void GUBloop(void *pvParam){
         canLoggerUpdate();
         
         CANMessage_t message;
-        if(canReceiveMessage(&message, pdMS_TO_TICKS(5))){
+        if(receiveCANMessage(&message, pdMS_TO_TICKS(5))){
             canLoggerProcessMessage(&message);
         }
         
@@ -169,10 +169,11 @@ void GUBToggleLED(){
 }
 
 /**
- * Update heartbeat led
+ * Update heartbeat led. This is part to the GUB Main loop to ensure that if the loop hangs
+ * at all it is visible on the heartbeat led. 
 */
 void GUBHeartbeatUpdate(){
-    if(esp_timer_get_time() - gubState.lastHeartbeat > HEARTBEAT_PERIOD){
+    if(esp_timer_get_time() - gubState.lastHeartbeat > HEARTBEAT_LED_PERIOD){
         gubState.lastHeartbeat = esp_timer_get_time();
         GUBToggleLED();
     }
