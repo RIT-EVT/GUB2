@@ -1,2 +1,14 @@
-idf_component_register(SRCS "Fileserver.c" "Driver_MCP251863.c" "main.c" "Mount.c" "Heartbeat.c"
+
+set(SOURCES 
+    "main.c" 
+    "GUB2.c" 
+    "Fileserver.c" 
+    "CANLogger.c"
+    "drivers/WIFIDriver.c" 
+    "drivers/Driver_MCP251863.c" 
+    "drivers/CANDriver.c"
+)
+
+
+idf_component_register(SRCS ${SOURCES}
                     INCLUDE_DIRS ".")

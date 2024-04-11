@@ -17,4 +17,10 @@ menu "GUB2 Configuration"
         default 4
         help
             Max number of the STA connects to AP.
+
+    config CONFIG_HAS_NEOPIXEL
+        bool "Board has NeoPixel LED"
+        default 1
+        help 
+            Configures if the board is using a Neopixel for the LED.
 endmenu

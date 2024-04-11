@@ -6,13 +6,13 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
-#include "esp_err.h"
-#include "esp_log.h"
-#include "esp_vfs.h"
-#include "esp_spiffs.h"
-#include "esp_http_server.h"
+#include <esp_err.h>
+#include <esp_log.h>
+#include <esp_vfs.h>
+#include <esp_spiffs.h>
+#include <esp_http_server.h>
 
-#define FILE_PATH_MAX (ESP_VFS_PATH_MAX + CONFIG_SPIFFS_OBJ_NAME_LEN)
+#define FILE_PATH_MAX (ESP_VFS_PATH_MAX + CONFIG_FATFS_MAX_LFN)
 
 /* Scratch buffer size */
 #define SCRATCH_BUFSIZE  8192
@@ -63,15 +63,7 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath)
     }
 
     /* Send HTML file header */
-    httpd_resp_sendstr_chunk(req, "<!DOCTYPE html><html><body>");
-
-    /* Get handle to embedded file upload script */
-    // extern const unsigned char upload_script_start[] asm("_binary_upload_script_html_start");
-    // extern const unsigned char upload_script_end[]   asm("_binary_upload_script_html_end");
-    // const size_t upload_script_size = (upload_script_end - upload_script_start);
-
-    /* Add file upload form and script which on execution sends a POST request to /upload */
-    // httpd_resp_send_chunk(req, (const char *)upload_script_start, upload_script_size);
+    httpd_resp_sendstr_chunk(req, "<!DOCTYPE html><html><head><meta http-equiv=\"refresh\" content=\"5\"></head><body>");
 
     /* Send file-list table definition and column labels */
     httpd_resp_sendstr_chunk(req,
@@ -90,7 +82,7 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath)
             continue;
         }
         sprintf(entrysize, "%ld", entry_stat.st_size);
-        ESP_LOGI(TAG, "Found %s : %s (%s bytes)", entrytype, entry->d_name, entrysize);
+        ESP_LOGD(TAG, "Found %s : %s (%s bytes)", entrytype, entry->d_name, entrysize);
 
         /* Send chunk of HTML file containing table entries with file name and size */
         httpd_resp_sendstr_chunk(req, "<tr><td><a href=\"");
@@ -325,6 +317,7 @@ esp_err_t start_file_server(const char *base_path)
 
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.stack_size = 5000; // add a little more stack (4096 default) to avoid http 431 errors
 
     /* Use the URI wildcard matching function in order to
      * allow the same handler to respond to multiple different
@@ -345,15 +338,6 @@ esp_err_t start_file_server(const char *base_path)
         .user_ctx  = server_data    // Pass server data as context
     };
     httpd_register_uri_handler(server, &file_download);
-
-    // /* URI handler for uploading files to server */
-    // httpd_uri_t file_upload = {
-    //     .uri       = "/upload/*",   // Match all URIs of type /upload/path/to/file
-    //     .method    = HTTP_POST,
-    //     .handler   = upload_post_handler,
-    //     .user_ctx  = server_data    // Pass server data as context
-    // };
-    // httpd_register_uri_handler(server, &file_upload);
 
     /* URI handler for deleting files from server */
     httpd_uri_t file_delete = {
