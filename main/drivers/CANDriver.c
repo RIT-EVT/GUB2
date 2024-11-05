@@ -28,7 +28,7 @@ void IRAM_ATTR CANDriverISRHandler(void *arg) {
 static void CANDriverTask(void *arg) {
     EventBits_t activeEvents = 0;
 
-    // wait until the mask has atleast on bit set
+    // wait until the mask has at least on bit set
     while (!driver.deviceEventMask)
         vTaskDelay(1);
 
@@ -38,17 +38,18 @@ static void CANDriverTask(void *arg) {
             // get any additional events while there are still messages in the FIFO
             activeEvents |= xEventGroupClearBits(driver.messageEvents, driver.deviceEventMask);
         } else {
-            // get any evens, wait until an even happens or 10ms without event
+            // get any events, wait until an even happens or 10ms without event
             activeEvents |=
                 xEventGroupWaitBits(driver.messageEvents, driver.deviceEventMask, true, false, portMAX_DELAY);
         }
 
-        // read messages from the CAN buses that currently have messages
-        for (int i = 0; activeEvents >> i && i <= (0x1 << CAN_BUS_COUNT); i++) {
+        // read a message from each CAN bus that currently have messages
+        for (int i = 0; activeEvents >> i && i < CAN_BUS_COUNT; i++) {
             // skip chips without any messages
             if (((activeEvents >> i) & 0x1) == 0) {
                 continue;
             }
+
             CANDevice_t *dev = &driver.devices[i];
             eERRORRESULT ErrorExt1 = ERR_OK;
 
@@ -96,8 +97,8 @@ static void CANDriverTask(void *arg) {
             receivedMessage.SEQ = tempMessage.MessageSEQ;
             receivedMessage.timestamp = esp_timer_get_time();
 
-            //? Is there a slim possibility of deadlock? Possibly need to be very careful when stats and messages are
-            //? read.
+            //? Is there a slim possibility of deadlock? Possibly need to be very careful with taking the 
+            //? Semaphore elsewhere then waiting to receive a message
             xSemaphoreTake(dev->statsMutex, portMAX_DELAY);
             if (FIFOstatus & MCP251XFD_RX_FIFO_OVERFLOW) {
                 dev->stats.fifoErrorCount++;
@@ -123,7 +124,7 @@ static void CANDriverTask(void *arg) {
  * @param globalEvents EventGroupHandle for main GUB component for notifying CAN events
  * @param eventFlag the flags to set on a new message
  */
-void canDriverInit(EventGroupHandle_t globalEvents, uint16_t messageFlag) {
+void setupCANDriver(EventGroupHandle_t globalEvents, uint16_t messageFlag) {
     // setup message queue
     driver.messageBuffer = xQueueCreate(CAN_BUFFER_SIZE, sizeof(CANMessage_t));
     driver.messageEvents = xEventGroupCreate();
@@ -149,7 +150,7 @@ void canDriverInit(EventGroupHandle_t globalEvents, uint16_t messageFlag) {
  * @param interruptPin The nINT1 pin of the MCP251863
  * @param standbyPin The STBY pin of the MCP251863 (optional, set -1 to ignore)
  */
-int canDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
+int addCANBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
     if (bus >= CAN_BUS_COUNT)
         return -1;
 
@@ -169,7 +170,7 @@ int canDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
     MCP251863_CAN_conf.SysInterruptFlags =
         (MCP251XFD_INT_RX_EVENT | MCP251XFD_INT_RX_OVERFLOW_EVENT | MCP251XFD_INT_CLEARABLE_FLAGS_MASK);
 
-    // Setup FIFO1 for receiving and FIFO2 fro transmitting
+    // Setup FIFO1 for receiving and FIFO2 for transmitting
     MCP251XFD_FIFO MCP251863_CAN_FIFO_Conf[CAN_FIFO_COUNT] = {
         {
             .Name = MCP251XFD_FIFO1,
@@ -194,13 +195,14 @@ int canDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
         },
     };
 
-    // configure the interupt pin
-    gpio_config_t pinConf = {};
-    pinConf.mode = GPIO_MODE_INPUT;
-    pinConf.intr_type = GPIO_INTR_NEGEDGE;
-    pinConf.pull_down_en = 0;
-    pinConf.pull_up_en = 0;
-    pinConf.pin_bit_mask = (1ULL << interruptPin);
+    // configure the interrupt pin
+    gpio_config_t pinConf = {
+        .mode = GPIO_MODE_INPUT,
+        .intr_type = GPIO_INTR_NEGEDGE,
+        .pull_down_en = 0,
+        .pull_up_en = 0,
+        .pin_bit_mask = (1ULL << interruptPin),
+    };
     gpio_config(&pinConf);
 
     // Configure standby pin
@@ -212,7 +214,7 @@ int canDriverAddBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
         gpio_set_level(standbyPin, 0); // pull low
     }
 
-    // Set interrupt handler for the pin.
+    // Set interrupt handler for the pin. Done before setup to ensure a falling edge is not missed
     gpio_isr_handler_add(interruptPin, CANDriverISRHandler, (void *)bus);
     gpio_intr_enable(interruptPin);
 
@@ -240,17 +242,16 @@ void canDriverUpdate() {
  * @param timeoutTicks the number of ticks to wait to retrieve a message.
  * @returns 0 for success or error code
  */
-int canReceiveMessage(CANMessage_t *message, uint32_t timeoutTicks) {
+int receiveCANMessage(CANMessage_t *message, uint32_t timeoutTicks) {
     return xQueueReceive(driver.messageBuffer, message, timeoutTicks);
 }
 
 /**
  * Get the message statistics for a bus from the driver.
  * @param bus the bus to retrieve the statistics for.
- * @param stats the message statistics for the bus
  * @param clear should the stats be cleared on read
  */
-CANDeviceStatistic_t canGetStatistics(int bus, bool clear) {
+CANDeviceStatistic_t getCANStatistics(int bus, bool clear) {
     CANDeviceStatistic_t busStat;
     xSemaphoreTake(driver.devices[bus].statsMutex, portMAX_DELAY);
     memcpy(&busStat, &driver.devices[bus].stats, sizeof(CANDeviceStatistic_t));
@@ -282,7 +283,7 @@ void printCANDriverState() {
            
     printf("\t| bus | MSG Cnt | FIFO ERR | BUFF ERR | COM ERR |\r\n");
     for (int i = 0; i < CAN_BUS_COUNT; i++) {
-        CANDeviceStatistic_t busStats = canGetStatistics(i, true);
+        CANDeviceStatistic_t busStats = getCANStatistics(i, true);
         printf("\t| %3d | %7lu | %s%8lu" LOG_RESET_COLOR " | %s%8lu" LOG_RESET_COLOR " | %s%7lu" LOG_RESET_COLOR
                " |\r\n",
                i, busStats.messageReceiveCount, busStats.fifoErrorCount ? LOG_BOLD(LOG_COLOR_RED) : "",

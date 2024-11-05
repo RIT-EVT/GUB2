@@ -7,6 +7,7 @@ debug.log
 
 #vscode Files
 .vscode/
+.cache/
 
 #debugging files
 *.trace

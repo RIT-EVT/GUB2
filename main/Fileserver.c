@@ -82,7 +82,7 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath)
             continue;
         }
         sprintf(entrysize, "%ld", entry_stat.st_size);
-        ESP_LOGI(TAG, "Found %s : %s (%s bytes)", entrytype, entry->d_name, entrysize);
+        ESP_LOGD(TAG, "Found %s : %s (%s bytes)", entrytype, entry->d_name, entrysize);
 
         /* Send chunk of HTML file containing table entries with file name and size */
         httpd_resp_sendstr_chunk(req, "<tr><td><a href=\"");
@@ -317,7 +317,7 @@ esp_err_t start_file_server(const char *base_path)
 
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.stack_size = 5000; // add a little more stack (4096 default)
+    config.stack_size = 5000; // add a little more stack (4096 default) to avoid http 431 errors
 
     /* Use the URI wildcard matching function in order to
      * allow the same handler to respond to multiple different

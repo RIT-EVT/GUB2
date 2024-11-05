@@ -33,7 +33,7 @@ int createBaseLogName(){
     DIR *d = opendir(CAN_LOG_PATH);
     if (!d) {
         ESP_LOGE(TAG, "Unable to open logging directory!");
-        return -3;
+        return LOGGER_ERR_BAD_PATH;
     }
 
     do {
@@ -55,21 +55,21 @@ int createBaseLogName(){
 
     fileStatus.baseName = &fileName[0];
     closedir(d);
-    return 0;
+    return LOGGER_ERR_OK;
 }
 
 /**
  * Write the csv file header to the first file
 */
 int writeLogHeader(){
-    if(fileStatus.CANFile == NULL) return -2;
-    if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return -1;
+    if(fileStatus.CANFile == NULL) return LOGGER_ERR_NOT_OPEN;
+    if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return LOGGER_ERR_SEMAPHORE_TIMEOUT;
 
     fprintf(fileStatus.CANFile, "TS,BUS,ID,SEQ,DLC,DATAn\r\n");
     fileStatus.headerWriten = true;
 
     xSemaphoreGive(fileStatus.fileMutex);
-    return 0;
+    return LOGGER_ERR_OK;
 }
 
 /**
@@ -87,7 +87,7 @@ int canLoggerInit(){
         mkdir(SD_CARD_CAN_LOG_PATH, 0777);
     }
 
-    if(!createBaseLogName()){
+    if(createBaseLogName() == LOGGER_ERR_OK){
         canLoggerOpenFile(false);
         writeLogHeader();
     }
@@ -102,8 +102,9 @@ int canLoggerUpdate(){
     if(fileStatus.CANFile == NULL){
         if(fileStatus.baseName == NULL){
             createBaseLogName();
+        } else {
+            canLoggerOpenFile(false);
         }
-        canLoggerOpenFile(false);
     }
 
     if(!fileStatus.headerWriten)
@@ -128,8 +129,8 @@ int canLoggerUpdate(){
  * @param msg the message to log
 */
 int canLoggerProcessMessage(CANMessage_t const *msg){
-    if(fileStatus.CANFile == NULL) return -2;
-    if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return -1;
+    if(fileStatus.CANFile == NULL) return LOGGER_ERR_NOT_OPEN;
+    if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return LOGGER_ERR_SEMAPHORE_TIMEOUT;
 
     fprintf(fileStatus.CANFile, "%lld,%u,%lx,%lu,%u,",
         msg->timestamp,
@@ -148,24 +149,24 @@ int canLoggerProcessMessage(CANMessage_t const *msg){
     fileStatus.totalBytesWritten = ftell(fileStatus.CANFile);
 
     xSemaphoreGive(fileStatus.fileMutex);
-    return 0;
+    return LOGGER_ERR_OK;
 }
 
 /**
  * Open a log file for writing.
  * @param reopenFile specifies if the file should be reopened to continue writing or a new one should be made
 */
-int canLoggerOpenFile(bool reopenFile){
-    if(fileStatus.baseName == NULL) return -3;
+int canLoggerOpenFile(bool append){
+    if(fileStatus.baseName == NULL) return LOGGER_ERR_ILLEGAL_NAME;
     if(fileStatus.CANFile != NULL){
         ESP_LOGW(TAG, "File already opened! Reopening");
         canLoggerCloseFile();
     }
 
-    if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return -1;
+    if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return LOGGER_ERR_SEMAPHORE_TIMEOUT;
     snprintf(fileStatus.filePath, 100, "%s/%s-%d.csv", SD_CARD_CAN_LOG_PATH, fileStatus.baseName, fileStatus.splitNumber);
 
-    if(reopenFile){
+    if(append){
         fileStatus.CANFile = fopen(fileStatus.filePath, "a");
     } else {
         fileStatus.CANFile = fopen(fileStatus.filePath, "w");
@@ -183,30 +184,31 @@ int canLoggerOpenFile(bool reopenFile){
     }
 
     xSemaphoreGive(fileStatus.fileMutex);
-    return 0;
+    return LOGGER_ERR_OK;
 }
 
 /**
  * Flush the internal buffers to the file.
 */
 int canLoggerFlushFile(){
-    if(fileStatus.CANFile == NULL) return -2;
-    if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return -1;
-
+    if(fileStatus.CANFile == NULL) return LOGGER_ERR_NOT_OPEN;
+    if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return LOGGER_ERR_SEMAPHORE_TIMEOUT;
+    
+    // Force file writing, both sync and flush are necessary to force buffers to disk.
     fflush(fileStatus.CANFile);
     fsync(fileno(fileStatus.CANFile));
     fileStatus.lastFlushTime = esp_timer_get_time();
     fileStatus.bytesWrittenAtFlush = fileStatus.totalBytesWritten;
 
     xSemaphoreGive(fileStatus.fileMutex);
-    return 0;
+    return LOGGER_ERR_OK;
 }
 
 /**
  * Close the log file.
 */
 int canLoggerCloseFile(){
-    if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return -1;
+    if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return LOGGER_ERR_NOT_OPEN;
 
     if(fileStatus.CANFile != NULL){
         fclose(fileStatus.CANFile);
@@ -214,5 +216,5 @@ int canLoggerCloseFile(){
 
     fileStatus.CANFile = NULL;
     xSemaphoreGive(fileStatus.fileMutex);
-    return 0;
+    return LOGGER_ERR_OK;
 }

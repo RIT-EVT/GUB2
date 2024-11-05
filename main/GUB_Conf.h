@@ -85,7 +85,7 @@
 // Real GUB pins
 #define PIN_NUM_HEARTBEAT   2
 
-#define HEARTBEAT_PERIOD    100 * 1000 //500ms
+#define HEARTBEAT_LED_PERIOD    100 * 1000 //100ms
 
 /**
  * GUB Configuration defines

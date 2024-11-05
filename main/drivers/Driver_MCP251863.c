@@ -120,17 +120,14 @@ uint16_t MCP251863DeviceComputeCRC16(const uint8_t* data, size_t size){
  * @param statusFlags the status flags to write
 */
 eERRORRESULT MCP251863SetFIFOStatus(MCP251XFD *pComp, eMCP251XFD_FIFO name, setMCP251XFD_FIFOstatus statusFlags){
-    #ifdef CHECK_NULL_PARAM
-  if (statusFlags == NULL) return ERR__PARAMETER_ERROR;
-#endif
   if (name >= MCP251XFD_FIFO_COUNT) return ERR__PARAMETER_ERROR;
 
   //--- Set address of the FIFO ---
   uint16_t Address = RegMCP251XFD_CiFIFOSTAm_FLAGS + (MCP251XFD_FIFO_REG_SIZE * ((uint16_t)name - 1u)); // Select the address of the FIFO
-  if (name == MCP251XFD_TEF) Address = RegMCP251XFD_CiTEFSTA_FLAGS;                                     // If it's the TEF then select its address
-  if (name == MCP251XFD_TXQ) Address = RegMCP251XFD_CiTXQSTA_FLAGS;                                     // If it's the TXQ then select its address
+  if (name == MCP251XFD_TEF) Address = RegMCP251XFD_CiTEFSTA_FLAGS;                                     // If it's the TEF FIFO then select its address
+  if (name == MCP251XFD_TXQ) Address = RegMCP251XFD_CiTXQSTA_FLAGS;                                     // If it's the TXQ FIFO then select its address
 
-  //--- Get FIFO status ---
+  //--- Set FIFO status ---
   return MCP251XFD_WriteSFR8(pComp, Address, (uint8_t)statusFlags);                                     // Write FIFO status (First byte only)
 }
 
