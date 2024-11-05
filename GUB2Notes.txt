@@ -11,6 +11,7 @@ Hardware
     SPI2 for SD
         
     SPI3 for CAN
+        MCP251863 (Transceiver + MCP2518FD)
         
     UART0 debug 
 

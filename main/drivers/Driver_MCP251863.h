@@ -11,7 +11,7 @@
   .DriverConfig   = MCP251XFD_DRIVER_NORMAL_USE                     \
                   | MCP251XFD_DRIVER_SAFE_RESET,                    \
   /*--- IO configuration ---*/                                      \
-  .GPIOsOutState   = MCP251XFD_GPIO0_LOW | MCP251XFD_GPIO1_HIGH,    \
+  .GPIOsOutLevel   = MCP251XFD_GPIO0_LOW | MCP251XFD_GPIO1_HIGH,    \
   /*--- Interface driver call functions ---*/                       \
   .SPI_ChipSelect  = SPI_CS_PIN,                                    \
   .InterfaceDevice = MCP251863_DEV_HANDLE,                          \
