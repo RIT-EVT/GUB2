@@ -11,19 +11,21 @@
 // #define PIN_NUM_CAN1_STB    5       // Can be -1 for unused
 
 // Real GUB pins
-// CAN A
+// CAN SPI
 #define CAN_SPI_HOST        SPI3_HOST
 #define PIN_NUM_CAN_MISO    13
 #define PIN_NUM_CAN_MOSI    11
 #define PIN_NUM_CAN_CLK     12
-#define PIN_NUM_CAN1_CS      10
-#define PIN_NUM_CAN1_RX_INT  17
-#define PIN_NUM_CAN1_STB     16
+
+//CAN A
+#define PIN_NUM_CAN_A_CS      10
+#define PIN_NUM_CAN_A_RX_INT  17
+#define PIN_NUM_CAN_A_STB     16
 
 // CAN MC
-#define PIN_NUM_CAN2_CS      14
-#define PIN_NUM_CAN2_RX_INT  5
-#define PIN_NUM_CAN2_STB     4
+#define PIN_NUM_CAN_MC_CS      14
+#define PIN_NUM_CAN_MC_RX_INT  5
+#define PIN_NUM_CAN_MC_STB     4
 
 /**
  * CAN configuration defines
@@ -34,7 +36,7 @@
 #define CAN_NOMINAL_BITRATE 500000      /* 500 Kbps*/
 #define CAN_DATA_BITRATE    1000000     /* 1   Mbps*/
 
-#define CAN_BUS_COUNT           1 
+#define CAN_BUS_COUNT           2 
 #define CAN_BUFFER_SIZE         100      // ESP message buffer size
 #define CAN_MAX_MESSAGE_SIZE    8       // max can message payload size of 8 bytes used to 
                                         // preallocate memory for the payload data

@@ -295,6 +295,22 @@ static esp_err_t delete_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* Handler a restart request */
+static esp_err_t restart_post_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "Restarting!");
+    esp_restart();
+
+    /* Redirect onto root */
+    httpd_resp_set_status(req, "303 See Other");
+    httpd_resp_set_hdr(req, "Location", "/");
+#ifdef CONFIG_EXAMPLE_HTTPD_CONN_CLOSE_HEADER
+    httpd_resp_set_hdr(req, "Connection", "close");
+#endif
+    httpd_resp_sendstr(req, "File deleted successfully");
+    return ESP_OK;
+}
+
 
 /* Function to start the file server */
 esp_err_t start_file_server(const char *base_path)
@@ -329,6 +345,15 @@ esp_err_t start_file_server(const char *base_path)
         ESP_LOGE(TAG, "Failed to start file server!");
         return ESP_FAIL;
     }
+
+    /* URI handler for restarting the board */
+    httpd_uri_t restart = {
+        .uri       = "/restart",   // Match all URIs of type /restart
+        .method    = HTTP_GET,
+        .handler   = restart_post_handler,
+        .user_ctx  = server_data    // Pass server data as context
+    };
+    httpd_register_uri_handler(server, &restart);
 
     /* URI handler for getting uploaded files */
     httpd_uri_t file_download = {
