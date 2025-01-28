@@ -10,6 +10,7 @@
 esp_err_t teseo_init(void);
 esp_err_t teseo_uart_send(const char *nmea_command);
 esp_err_t teseo_uart_read(void);
-void parse_nmea(const char *nmea);
+void parse_nmea(char *nmea);
+float convert_degrees(float nmea_coord);
 
 #endif // TESEO_H
