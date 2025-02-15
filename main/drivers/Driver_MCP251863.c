@@ -35,7 +35,7 @@ MCPError MCP251863DeviceSetup(MCP251XFD *dev, MCP251XFD_Config *conf, MCP251XFD_
         { 
             .Filter = MCP251XFD_FILTER0, 
             .EnableFilter = true, 
-            .Match = MCP251XFD_MATCH_ONLY_SID,
+            .Match = MCP251XFD_MATCH_SID_EID,
             .AcceptanceID = MCP251XFD_ACCEPT_ALL_MESSAGES, 
             .AcceptanceMask = MCP251XFD_ACCEPT_ALL_MESSAGES, 
             .PointTo = MCP251XFD_FIFO1, 
