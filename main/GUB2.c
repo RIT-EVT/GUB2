@@ -101,10 +101,10 @@ void GUBInit()
  */
 void GUBloop(void *pvParam)
 {
+    // vTaskDelay(pdMS_TO_TICKS(1000)); // 1-second delay between commands
     teseo_uart_read();
-    teseo_uart_send("$PSTMTG*09\r\n");
-    vTaskDelay(pdMS_TO_TICKS(1000)); // 1-second delay between commands
-
+    set_teseo_build();
+    int counter = 0;
     while (true)
     {
         GUBHeartbeatUpdate();
@@ -127,7 +127,8 @@ void GUBloop(void *pvParam)
         // vTaskDelay(pdMS_TO_TICKS(5));
         teseo_uart_read();
         // teseo_uart_send("$PSTMGETSWVER*09\r\n");
-        teseo_uart_send("$PSTMGETSWVER,2*17\r\n");
+
+        // counter++;
     }
 }
 
