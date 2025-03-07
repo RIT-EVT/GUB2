@@ -100,7 +100,7 @@ esp_err_t teseo_uart_send(const char *nmea_com)
     uart_write_bytes(TESEO_UART_PORT, nmea_command, length);
     ESP_LOGI(TAG, "Sent: '%s'", nmea_command);
     char response[1024];
-    int len = uart_read_bytes(TESEO_UART_PORT, response, sizeof(response), pdMS_TO_TICKS(1000));
+    uart_read_bytes(TESEO_UART_PORT, response, sizeof(response), pdMS_TO_TICKS(1000));
 
     free(nmea_command);
     return ESP_OK;
@@ -125,9 +125,16 @@ esp_err_t teseo_uart_read(void)
     return ESP_OK;
 }
 
+void request_gps_data()
+{
+    teseo_uart_send("PSTMNMEAREQUEST,0x12,0x2000");
+}
+
 void set_teseo_build()
 {
-    teseo_uart_send("PSTMSETPAR,1201,0x12"); // disable all lower 32 messages except GSA
+    teseo_uart_send("PSTMSTANDBYENABLE,0");
+    teseo_uart_send("PSTMINITGPS,435.047,N,7740.545,W,0600,04,03,2025,01,36,02");
+    teseo_uart_send("PSTMSETPAR,1201,0x12"); // disable all lower 32 messages except GGA and VTG
     // teseo_uart_send("$PSTMGETPAR,1201*21\r\n");
     teseo_uart_send("PSTMSAVEPAR"); // Save it to non volatile memory
     teseo_uart_send("PSTMSRR");     // reset it to activate the changes
@@ -163,6 +170,29 @@ void parse_nmea(char *nmea)
         //     }
 
         //     ESP_LOGI(TAG, "Parsed GPGGA: Time = %f, Latitude = %f, Longitude = %f\n\n\n\n", time, convert_degrees(latitude), convert_degrees(longitude));
+        // } else if (strncmp(temp, "$GPVTG", 6) == 0) {
+        //     char *token = strtok(temp, ",");
+        //     int field = 0;
+        //     float true_track = 0.0, speed_kmh = 0.0;
+        //     while (token != NULL)
+        //     {
+        //         field++;
+        //         if (field == 2)
+        //         { // Time
+        //             time = atof(token);
+        //         }
+        //         else if (field == 3)
+        //         { // Latitude
+        //             latitude = atof(token);
+        //         }
+        //         else if (field == 8)
+        //         { // Speed in km/h
+        //            speed_kmh = atof(token);
+        //         }
+        //         token = strtok(NULL, ",");
+        //     }
+
+        // ESP_LOGI(TAG, "Parsed GPVTG: True Track = %.2f°, Speed = %.2f km/h\n\n\n\n", true_track, speed_kmh);
         // }
         temp = strtok(NULL, "\n");
     }

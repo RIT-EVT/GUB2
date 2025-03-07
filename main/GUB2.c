@@ -101,10 +101,15 @@ void GUBInit()
  */
 void GUBloop(void *pvParam)
 {
-    // vTaskDelay(pdMS_TO_TICKS(1000)); // 1-second delay between commands
-    teseo_uart_read();
+    vTaskDelay(pdMS_TO_TICKS(300));
     set_teseo_build();
-    int counter = 0;
+    vTaskDelay(pdMS_TO_TICKS(250));
+    teseo_uart_read();
+
+    teseo_uart_send("PSTMCOLD");
+    teseo_uart_read();
+    vTaskDelay(pdMS_TO_TICKS(250));
+    teseo_uart_send("PSTMINITGPS,435.047,N,7740.545,W,0600,04,03,2025,01,36,02");
     while (true)
     {
         GUBHeartbeatUpdate();
@@ -118,13 +123,12 @@ void GUBloop(void *pvParam)
         // canDriverUpdate();
         // canLoggerUpdate();
 
-        CANMessage_t message;
+        // CANMessage_t message;
         // if(receiveCANMessage(&message, pdMS_TO_TICKS(5))){
         //     canLoggerProcessMessage(&message);
         // }
 
         //* needed if not relying to the timeout of the queue
-        // vTaskDelay(pdMS_TO_TICKS(5));
         teseo_uart_read();
         // teseo_uart_send("$PSTMGETSWVER*09\r\n");
 
