@@ -31,6 +31,8 @@ git clone --recurse-submodules https://github.com/RIT-EVT/GUB2.git
 ```
 Once the repository is cloned, the project can be built in VSCode using the ESP-IDF extension and pressing the build button on the bottom status bar. The project can also be built with `cmake build` from the ESP-IDF Terminal.
 
+On Mac, you may need to set the ENV IDF_PATH after finishing the installation. Refer [to this guide](https://docs.espressif.com/projects/esp-idf/en/v3.1.5/get-started-cmake/add-idf_path-to-profile.html) to add IDF PATH and PATH to the terminal profile. Similarly, in VS-code setting, you may need to set: `idf: Esp Idf Path Win` to `${env:HOME}/esp/esp-idf`.
+
 ## Development Setup
 The GUB software was developed and tested with the ESP32-S3-DevKitC-1. This board consists of an ESP32-S3-WROOM-1 with 8 MB Flash and 512KB of SRAM along with a NEOPIXEL on pin 48. The software has only been tested with a single CAN cip, but support for multiple has been added.  
 

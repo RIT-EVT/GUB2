@@ -72,6 +72,13 @@ eERRORRESULT MCP251863DeviceInit(void *pIntDev, uint8_t chipSelect, const uint32
         .queue_size=7,              //We want to be able to queue 7 transactions at a time
         .pre_cb=NULL,               //Specify pre-transfer callback to handle D/C line
     };
+    
+
+    //check for re-initialization of first bus, DONT DELETE
+    if(*spiDevice){
+        ret = spi_bus_remove_device(*spiDevice);
+        ESP_ERROR_CHECK(ret);
+    }
 
     ret = spi_bus_add_device(CAN_SPI_HOST, &devCFG, spiDevice);
     ESP_ERROR_CHECK(ret);
