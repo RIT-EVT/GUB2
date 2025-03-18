@@ -27,7 +27,7 @@ Before building this project, the ESP-IDF tool chains needs to be installed. The
 
 Once the build tools are setup, clone this repository with:
 ```
-git clone --recurse-submodules https://github.com/RIT-EVT/GUB2.git
+git clone --recurse-submodules git@github.com:RIT-EVT/GUB2.git
 ```
 Once the repository is cloned, the project can be built in VSCode using the ESP-IDF extension and pressing the build button on the bottom status bar. The project can also be built with `cmake build` from the ESP-IDF Terminal.
 
