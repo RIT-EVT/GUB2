@@ -14,6 +14,7 @@
 #include "drivers/CANDriver.h"
 #include "CANLogger.h"
 #include "drivers/TESEO-LIV3F.h"
+#include "drivers/Lora.h"
 
 static const char *TAG = "GUB2";
 
@@ -90,7 +91,8 @@ void GUBInit()
 
     GUBInitLED();
 
-    teseo_init();
+    // teseo_init();
+    lora_init();
 
     ESP_LOGI(TAG, "GUB Setup, starting main loop");
     xTaskCreate(GUBloop, "GUB", GUB_STACK_SIZE, NULL, 2, &gubState.mainTaskHandler);
@@ -101,15 +103,15 @@ void GUBInit()
  */
 void GUBloop(void *pvParam)
 {
-    vTaskDelay(pdMS_TO_TICKS(300));
-    set_teseo_build();
-    vTaskDelay(pdMS_TO_TICKS(250));
-    teseo_uart_read();
+    // vTaskDelay(pdMS_TO_TICKS(300));
+    // set_teseo_build();
+    // vTaskDelay(pdMS_TO_TICKS(250));
+    // teseo_uart_read();
 
-    teseo_uart_send("PSTMCOLD");
-    teseo_uart_read();
-    vTaskDelay(pdMS_TO_TICKS(250));
-    teseo_uart_send("PSTMINITGPS,435.047,N,7740.545,W,0600,04,03,2025,01,36,02");
+    // teseo_uart_send("PSTMCOLD");
+    // teseo_uart_read();
+    // vTaskDelay(pdMS_TO_TICKS(250));
+    // teseo_uart_send("PSTMINITGPS,435.047,N,7740.545,W,0600,04,03,2025,01,36,02");
     while (true)
     {
         GUBHeartbeatUpdate();
@@ -129,8 +131,7 @@ void GUBloop(void *pvParam)
         // }
 
         //* needed if not relying to the timeout of the queue
-        teseo_uart_read();
-        // teseo_uart_send("$PSTMGETSWVER*09\r\n");
+        // teseo_uart_read();
 
         // counter++;
     }

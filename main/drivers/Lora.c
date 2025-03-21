@@ -1,11 +1,26 @@
 // #include "Lora.h"
 #include "driver/uart.h"
+#include "driver/gpio.h"
 #include "esp_log.h"
+#include "Lora.h"
+#define BUFFER_SIZE 1024
 
 #define UART_BUFFER_SIZE 1024
 static const char *TAG = "LORA";
+static char _deveui[17] = {0};
+static char _appeui[17] = {0};
+static char _appskey[33] = {0};
+static char _devAddr[9] = {0};
+static char _nwkskey[33] = {0};
+static bool _otaa = false;
 
-esp_err_t lora_init(void)
+void lora_init(void)
+{
+    lora_uart_init();
+    lora_join_network(OTAA);
+}
+
+void lora_uart_init(void)
 {
     const uart_config_t uart_config = {
         .baud_rate = LORA_UART_BAUDRATE,
@@ -27,37 +42,39 @@ esp_err_t lora_init(void)
     ESP_LOGI("UART_INIT", "UART0 initialized for LORA");
 }
 
-esp_err_t lora_join_network(LORA_JOIN_TYPE joinType)
+bool lora_join_network(LORA_JOIN_TYPE joinType)
 {
-    switch (joinType):
-    case OTAA
+    switch (joinType)
+    {
+    case OTAA:
     {
         const char *appEui = "70B3D57ED00001A6";
         const char *appKey = "A23C96EE13804963F8C2BD6285448198";
-        initOTAA(appEui, appKey);
-        break;
+        return initOTAA(appEui, appKey, "0");
     }
-    case ABP
+    case ABP:
     { // ABP
         const char *devAddr = "02017201";
         const char *nwkSKey = "AE17E567AECC8787F749A62F5541D522";
         const char *appSKey = "8D7FFEF938589D95AAD928C2E2E7E48F";
-        initABP(devAddr, appSKey, nwkSKey);
-        break;
+        return initABP(devAddr, appSKey, nwkSKey);
     }
+    }
+    return false;
 }
 
-void initABP(const char *devAddr, const char *appSKey, const char *nwkSKey)
+bool initABP(const char *DevAddr, const char *AppSKey, const char *NwkSKey)
 {
     _otaa = false;
-    strcpy(_devAddr, devAddr);
+    strcpy(_devAddr, DevAddr);
     strcpy(_appskey, AppSKey);
     strcpy(_nwkskey, NwkSKey);
     
     char response[BUFFER_SIZE];
 
     // Clear UART buffer
-    while (uart_read_bytes(LORA_UART_NUM, (uint8_t *)response, sizeof(response), 100 / portTICK_PERIOD_MS) > 0);
+    while (uart_read_bytes(LORA_UART_NUM, (uint8_t *)response, sizeof(response), 100 / portTICK_PERIOD_MS) > 0)
+        ;
 
     sendRawCommand("mac reset", response, sizeof(response));
 
@@ -69,7 +86,7 @@ void initABP(const char *devAddr, const char *appSKey, const char *nwkSKey)
     setAutomaticReply(false);
     setTXoutputPower(5);
 
-    sendMacSet("dr", "5");  //0= min, 7=max
+    sendMacSet("dr", "5"); // 0= min, 7=max
 
     // Save configuration
     sendRawCommand("mac save", response, sizeof(response));
@@ -91,12 +108,15 @@ void initABP(const char *devAddr, const char *appSKey, const char *nwkSKey)
     }
 }
 
-void initOTAA(const char *appEui, const char *appKey) {
+bool initOTAA(const char *AppEUI, const char *AppKey, const char *DevEUI)
+{
     _otaa = true;
+    strcpy(_nwkskey, "0");
     char response[BUFFER_SIZE];
 
     // Clear UART buffer
-    while (uart_read_bytes(LORA_UART_NUM, (uint8_t *)response, sizeof(response), 100 / portTICK_PERIOD_MS) > 0);
+    while (uart_read_bytes(LORA_UART_NUM, (uint8_t *)response, sizeof(response), 100 / portTICK_PERIOD_MS) > 0)
+        ;
 
     // Reset the module
     sendRawCommand("mac reset", response, sizeof(response));

@@ -11,7 +11,7 @@ Date & Time is on GPRMC. Find out how to get the nmea message, but only a single
 #include "esp_rom_sys.h"
 #include "driver/gpio.h"
 
-#include "TESEO-LIV3f.h"
+#include "TESEO-LIV3F.h"
 
 // UART configuration
 

@@ -5,7 +5,6 @@
 #ifndef LORA_H
 #define LORA_H
 
-#include "driver/uart.h"
 #include "esp_err.h"
 #include <string.h>
 
@@ -13,34 +12,50 @@
 #define LORA_UART_TX_PIN 18
 #define LORA_UART_RX_PIN 17
 #define LORA_RESET_PIN 1
+#define LORA_INT0_PIN 15
 #define LORA_INT1_PIN 8
 #define LORA_UART_BAUDRATE 57600
-#define LORA_UART_BUF_SIZE 256
+#define UART_BUFFER_SIZE 1024
 
 #define LORA_OK_RESPONSE "ok"
 #define LORA_ERROR_RESPONSE "invalid_param"
 
-enum LORA_JOIN_TYPE
+typedef enum
 {
     OTAA = 0,
     ABP = 1
-};
+} LORA_JOIN_TYPE;
 
-static char _deveui[17] = {0};
-static char _appeui[17] = {0};
-static char _appskey[33] = {0};
-static char _devAddr[9] = {0};
-static char _nwkskey[33] = {0};
-static bool _otaa = false;
+typedef enum
+{
+    TX_FAIL = 0, // The transmission failed.
+                 // If you sent a confirmed message and it is not acked,
+                 // this will be the returned value.
 
-esp_err_t lora_init(void);
-esp_err_t lora_join_network(LORA_JOIN_TYPE joinType);
+    TX_SUCCESS = 1, // The transmission was successful.
+                    // Also the case when a confirmed message was acked.
+
+    TX_WITH_RX = 2 // A downlink message was received after the transmission.
+                   // This also implies that a confirmed message is acked.
+} TX_RETURN_TYPE;
+
+void lora_init(void);
+void lora_uart_init(void);
+bool lora_join_network(LORA_JOIN_TYPE joinType);
 bool sendRawCommand(const char *command, char *response, size_t response_size);
-void sendMacSet(const char *key, const char *value);
+bool sendMacSet(const char *key, const char *value);
 bool setAdaptiveDataRate(bool enabled);
 bool setAutomaticReply(bool enabled);
 bool setTXoutputPower(int pwridx);
-void initOTAA(const char *appEui, const char *appKey);
-void initABP(const char *devAddr, const char *appSKey, const char *nwkSKey);
+bool initOTAA(const char *appEui, const char *appKey, const char *DevEUI);
+bool initABP(const char *devAddr, const char *appSKey, const char *nwkSKey);
+
+TX_RETURN_TYPE lora_tx(const char *data);
+
+TX_RETURN_TYPE lora_txBytes(const char *data, uint8_t size);
+
+TX_RETURN_TYPE lora_txUncnf(const char *data);
+
+TX_RETURN_TYPE lora_txCnf(const char *data);
 
 #endif // LORA_H
