@@ -4,14 +4,15 @@
 #include "esp_log.h"
 #include "Lora.h"
 #define BUFFER_SIZE 1024
+#define UART_TIMEOUT_MS 2000
 
-#define UART_BUFFER_SIZE 1024
 static const char *TAG = "LORA";
 static char _deveui[17] = {0};
 static char _appeui[17] = {0};
 static char _appskey[33] = {0};
 static char _devAddr[9] = {0};
 static char _nwkskey[33] = {0};
+static char _rxMessenge[128] = {0};
 static bool _otaa = false;
 
 void lora_init(void)

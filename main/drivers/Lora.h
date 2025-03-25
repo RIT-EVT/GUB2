@@ -39,6 +39,25 @@ typedef enum
                    // This also implies that a confirmed message is acked.
 } TX_RETURN_TYPE;
 
+typedef enum
+{
+    BUSY,
+    FRAME_COUNTER_ERR_REJOIN_NEEDED,
+    INVALID_DATA_LEN,
+    INVALID_PARAM,
+    MAC_ERR,
+    MAC_PAUSED,
+    MAC_RX,
+    MAC_TX_OK,
+    NO_FREE_CH,
+    NOT_JOINED,
+    OK,
+    RADIO_ERR,
+    RADIO_TX_OK,
+    SILENT,
+    UNKNOWN
+} LORA_RESPONSE_TYPE;
+
 void lora_init(void);
 void lora_uart_init(void);
 bool lora_join_network(LORA_JOIN_TYPE joinType);
@@ -57,5 +76,7 @@ TX_RETURN_TYPE lora_txBytes(const char *data, uint8_t size);
 TX_RETURN_TYPE lora_txUncnf(const char *data);
 
 TX_RETURN_TYPE lora_txCnf(const char *data);
+
+TX_RETURN_TYPE lora_txCommand(const char *command, const char *data, bool shouldEncode);
 
 #endif // LORA_H
