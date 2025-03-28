@@ -7,8 +7,9 @@
 
 #include "esp_err.h"
 #include <string.h>
+#include "driver/uart.h"
 
-#define LORA_UART_NUM UART_NUM_1
+#define LORA_UART_NUM UART_NUM_0
 #define LORA_UART_TX_PIN 18
 #define LORA_UART_RX_PIN 17
 #define LORA_RESET_PIN 1
@@ -68,6 +69,8 @@ bool setAutomaticReply(bool enabled);
 bool setTXoutputPower(int pwridx);
 bool initOTAA(const char *appEui, const char *appKey, const char *DevEUI);
 bool initABP(const char *devAddr, const char *appSKey, const char *nwkSKey);
+
+void readUntilNewline(char *receivedData, int max_len);
 
 TX_RETURN_TYPE lora_tx(const char *data);
 
