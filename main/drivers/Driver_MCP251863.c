@@ -74,7 +74,7 @@ eERRORRESULT MCP251863DeviceInit(void *pIntDev, uint8_t chipSelect, const uint32
     };
     
 
-    //check for re-initialization of first bus, DONT DELETE
+    //check if bus is already initialized and re-initialize
     if(*spiDevice){
         ret = spi_bus_remove_device(*spiDevice);
         ESP_ERROR_CHECK(ret);
