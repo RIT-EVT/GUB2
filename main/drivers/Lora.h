@@ -69,6 +69,7 @@ bool setAutomaticReply(bool enabled);
 bool setTXoutputPower(int pwridx);
 bool initOTAA(const char *appEui, const char *appKey, const char *DevEUI);
 bool initABP(const char *devAddr, const char *appSKey, const char *nwkSKey);
+void lora_pin_reset(void);
 
 void readUntilNewline(char *receivedData, int max_len);
 
@@ -80,6 +81,6 @@ TX_RETURN_TYPE lora_txUncnf(const char *data);
 
 TX_RETURN_TYPE lora_txCnf(const char *data);
 
-TX_RETURN_TYPE lora_txCommand(const char *command, const char *data, bool shouldEncode);
+TX_RETURN_TYPE lora_txCommand(const char *command, const char *data);
 
 #endif // LORA_H

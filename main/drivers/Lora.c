@@ -2,6 +2,7 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "Lora.h"
+
 #define BUFFER_SIZE 1024
 #define UART_TIMEOUT_MS 2000
 
@@ -17,8 +18,21 @@ static bool _otaa = false;
 void lora_init(void)
 {
     lora_uart_init();
-    lora_join_network(OTAA);
+    lora_pin_reset();
+    // lora_join_network(OTAA);
     ESP_LOGI(TAG, "LORA INITIALIZED");
+}
+
+void lora_pin_reset(void)
+{
+    gpio_reset_pin(LORA_RESET_PIN);
+
+    gpio_set_direction(LORA_RESET_PIN, GPIO_MODE_OUTPUT);
+
+    gpio_set_level(LORA_RESET_PIN, 0);
+    vTaskDelay(pdMS_TO_TICKS(50));
+    gpio_set_level(LORA_RESET_PIN, 1);
+    vTaskDelay(pdMS_TO_TICKS(200));
 }
 
 void lora_uart_init(void)
@@ -254,12 +268,12 @@ TX_RETURN_TYPE lora_tx(const char *data)
 
 TX_RETURN_TYPE lora_txCnf(const char *data)
 {
-    return lora_txCommand("mac tx cnf 1 ", data, true);
+    return lora_txCommand("mac tx cnf 1 ", data);
 }
 
 TX_RETURN_TYPE lora_txUncnf(const char *data)
 {
-    return lora_txCommand("mac tx uncnf 1 ", data, true);
+    return lora_txCommand("mac tx uncnf 1 ", data);
 }
 
 LORA_RESPONSE_TYPE determineReceivedDataType(const char *receivedData)
@@ -397,7 +411,7 @@ void extract_rx_message(const char *receivedData, char *rxMessage, size_t rxMess
     }
 }
 
-TX_RETURN_TYPE lora_txCommand(const char *command, const char *data, bool shouldEncode)
+TX_RETURN_TYPE lora_txCommand(const char *command, const char *data)
 {
     bool send_success = false;
     uint8_t busy_count = 0;
@@ -424,8 +438,6 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data, bool should
 
         uart_write_bytes(LORA_UART_NUM, "\r\n", 2);
 
-        // int len = uart_read_bytes(LORA_UART_NUM, receivedData, sizeof(receivedData) - 1, pdMS_TO_TICKS(UART_TIMEOUT_MS));
-
         char *receivedData = malloc(sizeof(char) * 128);
         readUntilNewline(receivedData, 128);
 
@@ -441,6 +453,7 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data, bool should
             {
                 // SUCCESS!!
                 send_success = true;
+                free(receivedData);
                 return TX_SUCCESS;
             }
 
@@ -449,11 +462,13 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data, bool should
                 // example: mac_rx 1 54657374696E6720313233
                 extract_rx_message(receivedData, _rxMessage, sizeof(_rxMessage));
                 send_success = true;
+                free(receivedData);
                 return TX_WITH_RX;
             }
 
             case MAC_ERR:
             {
+                free(receivedData);
                 lora_init();
                 break;
             }
@@ -462,6 +477,7 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data, bool should
             {
                 // this should never happen if the prototype worked
                 send_success = true;
+                free(receivedData);
                 return TX_FAIL;
             }
 
@@ -469,11 +485,13 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data, bool should
             {
                 // SUCCESS!!
                 send_success = true;
+                free(receivedData);
                 return TX_SUCCESS;
             }
 
             case RADIO_ERR:
             {
+                free(receivedData);
                 // This should never happen. If it does, something major is wrong.
                 lora_init();
                 break;
@@ -481,6 +499,7 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data, bool should
 
             default:
             {
+                free(receivedData);
                 // unknown response
                 // init();
             }
@@ -492,11 +511,13 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data, bool should
         {
             // should not happen if we typed the commands correctly
             send_success = true;
+            free(receivedData);
             return TX_FAIL;
         }
 
         case NOT_JOINED:
         {
+            free(receivedData);
             lora_init();
             break;
         }
@@ -505,23 +526,27 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data, bool should
         {
             // retry
             vTaskDelay(pdMS_TO_TICKS(1000));
+            free(receivedData);
             break;
         }
 
         case SILENT:
         {
+            free(receivedData);
             lora_init();
             break;
         }
 
         case FRAME_COUNTER_ERR_REJOIN_NEEDED:
         {
+            free(receivedData);
             lora_init();
             break;
         }
 
         case BUSY:
         {
+            free(receivedData);
             busy_count++;
 
             // Not sure if this is wise. At low data rates with large packets
@@ -542,12 +567,14 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data, bool should
 
         case MAC_PAUSED:
         {
+            free(receivedData);
             lora_init();
             break;
         }
 
         case INVALID_DATA_LEN:
         {
+            free(receivedData);
             // should not happen if the prototype worked
             send_success = true;
             return TX_FAIL;
@@ -555,6 +582,7 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data, bool should
 
         default:
         {
+            free(receivedData);
             // unknown response after mac tx command
             lora_init();
             break;

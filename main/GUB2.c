@@ -91,8 +91,8 @@ void GUBInit()
 
     GUBInitLED();
 
-    // teseo_init();
-    lora_init();
+    teseo_init();
+    // lora_init();
 
     ESP_LOGI(TAG, "GUB Setup, starting main loop");
     xTaskCreate(GUBloop, "GUB", GUB_STACK_SIZE, NULL, 2, &gubState.mainTaskHandler);
@@ -107,7 +107,21 @@ void GUBloop(void *pvParam)
     // set_teseo_build();
     // vTaskDelay(pdMS_TO_TICKS(250));
     // teseo_uart_read();
-
+    // uart_write_bytes(LORA_UART_NUM, "sys factoryRESET\r\n", strlen("sys factoryRESET\r\n"));
+    // char res[128];
+    // int length = 0;
+    // uart_get_buffered_data_len(LORA_UART_NUM, (size_t *)&length);
+    // int len = uart_read_bytes(LORA_UART_NUM, (uint8_t *)res, length, pdMS_TO_TICKS(1000));
+    // if (len > 0)
+    // {
+    //     res[len] = '\0';
+    //     ESP_LOGI("SysFact", "Response: %s", res);
+    // }
+    // else
+    // {
+    //     ESP_LOGW("SysFact", "No response from LORA");
+    // }
+    int counter = 0;
     // teseo_uart_send("PSTMCOLD");
     // teseo_uart_read();
     // vTaskDelay(pdMS_TO_TICKS(250));
@@ -121,7 +135,22 @@ void GUBloop(void *pvParam)
         //     ESP_LOGW(TAG, "SD card not mounted! Attempting to remount...");
         //     GUBMountSDCard(SD_CARD_BASE_PATH);
         // }
+        if (counter % 1000 == 0)
+        {
 
+            //     uart_write_bytes(LORA_UART_NUM, "sys get ver\r\n", strlen("sys get ver\r\n"));
+            //     char res[64];
+            //     int len = uart_read_bytes(LORA_UART_NUM, (uint8_t *)res, sizeof(res) - 1, pdMS_TO_TICKS(1000));
+            //     if (len > 0)
+            //     {
+            //         res[len] = '\0';
+            //         ESP_LOGI("LoRa", "Response: %s", res);
+            //     }
+            //     else
+            //     {
+            //         ESP_LOGW("LoRa", "No response from LORA");
+            //     }
+        }
         // canDriverUpdate();
         // canLoggerUpdate();
 
@@ -131,9 +160,9 @@ void GUBloop(void *pvParam)
         // }
 
         //* needed if not relying to the timeout of the queue
-        // teseo_uart_read();
+        teseo_uart_read();
 
-        // counter++;
+        counter++;
     }
 }
 
