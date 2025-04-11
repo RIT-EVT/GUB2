@@ -59,28 +59,29 @@ typedef enum
     UNKNOWN
 } LORA_RESPONSE_TYPE;
 
-void lora_init(void);
-void lora_uart_init(void);
-bool lora_join_network(LORA_JOIN_TYPE joinType);
-bool sendRawCommand(const char *command, char *response, size_t response_size);
+void loraInit(void);
+esp_err_t loraUartInit(void);
+bool loraJoinNetwork(LORA_JOIN_TYPE joinType);
+bool sendRawLoraCommand(const char *command, char *response, size_t response_size);
 bool sendMacSet(const char *key, const char *value);
 bool setAdaptiveDataRate(bool enabled);
 bool setAutomaticReply(bool enabled);
 bool setTXoutputPower(int pwridx);
 bool initOTAA(const char *appEui, const char *appKey, const char *DevEUI);
 bool initABP(const char *devAddr, const char *appSKey, const char *nwkSKey);
-void lora_pin_reset(void);
+void loraPinReset(void);
+void loraAutobaud(void);
 
 void readUntilNewline(char *receivedData, int max_len);
 
-TX_RETURN_TYPE lora_tx(const char *data);
+TX_RETURN_TYPE loraTX(const char *data);
 
-TX_RETURN_TYPE lora_txBytes(const char *data, uint8_t size);
+TX_RETURN_TYPE loraTXBytes(const char *data, uint8_t size);
 
-TX_RETURN_TYPE lora_txUncnf(const char *data);
+TX_RETURN_TYPE loraTXUncnf(const char *data);
 
-TX_RETURN_TYPE lora_txCnf(const char *data);
+TX_RETURN_TYPE loraTXCnf(const char *data);
 
-TX_RETURN_TYPE lora_txCommand(const char *command, const char *data);
+TX_RETURN_TYPE loraTXCommand(const char *command, const char *data);
 
 #endif // LORA_H

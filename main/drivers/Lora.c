@@ -15,15 +15,49 @@ static char _nwkskey[33] = {0};
 static char _rxMessage[128] = {0};
 static bool _otaa = false;
 
-void lora_init(void)
+void loraInit(void)
 {
-    lora_uart_init();
-    lora_pin_reset();
-    // lora_join_network(OTAA);
+    loraUartInit();
+    // loraPinReset();
+    // loraJoinNetwork(OTAA);
+    loraAutobaud();
     ESP_LOGI(TAG, "LORA INITIALIZED");
 }
 
-void lora_pin_reset(void)
+void loraAutobaud(void)
+{
+    char response[128];
+    int len = 0;
+
+    // Try a maximum of 10 times with a 1 second delay
+    for (uint8_t i = 0; i < 10; i++)
+    {
+        // Wait 1 second
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        // Send break signal
+        uart_write_bytes(LORA_UART_NUM, "\0\x55", 2);
+
+        // Send 0x55
+        // uint8_t fiftyFive = 0x55;
+        // uart_write_bytes(LORA_UART_NUM, (const char *)&fiftyFive, 1);
+
+        uart_write_bytes(LORA_UART_NUM, "\r\n", 2);
+
+        const char *command = "sys get ver\r\n";
+        uart_write_bytes(LORA_UART_NUM, command, strlen(command));
+
+        len = uart_read_bytes(LORA_UART_NUM, (uint8_t *)response, sizeof(response) - 1, pdMS_TO_TICKS(UART_TIMEOUT_MS));
+        if (len > 0)
+        {
+            response[len] = '\0';
+            printf("Received: %s\n", response);
+            break;
+        }
+    }
+}
+
+void loraPinReset(void)
 {
     gpio_reset_pin(LORA_RESET_PIN);
 
@@ -35,7 +69,7 @@ void lora_pin_reset(void)
     vTaskDelay(pdMS_TO_TICKS(200));
 }
 
-void lora_uart_init(void)
+esp_err_t loraUartInit(void)
 {
     const uart_config_t uart_config = {
         .baud_rate = LORA_UART_BAUDRATE,
@@ -54,9 +88,10 @@ void lora_uart_init(void)
     uart_driver_install(LORA_UART_NUM, UART_BUFFER_SIZE, 0, 0, NULL, 0);
 
     ESP_LOGI("UART_INIT", "UART initialized for LORA");
+    return ESP_OK;
 }
 
-bool lora_join_network(LORA_JOIN_TYPE joinType)
+bool loraJoinNetwork(LORA_JOIN_TYPE joinType)
 {
     switch (joinType)
     {
@@ -91,7 +126,7 @@ bool initABP(const char *DevAddr, const char *AppSKey, const char *NwkSKey)
     while (uart_read_bytes(LORA_UART_NUM, (uint8_t *)response, sizeof(response), 100 / portTICK_PERIOD_MS) > 0)
         ;
 
-    sendRawCommand("mac reset", response, sizeof(response));
+    sendRawLoraCommand("mac reset", response, sizeof(response));
 
     sendMacSet("nwkskey", _nwkskey);
     sendMacSet("appskey", _appskey);
@@ -104,10 +139,10 @@ bool initABP(const char *DevAddr, const char *AppSKey, const char *NwkSKey)
     sendMacSet("dr", "5"); // 0= min, 7=max
 
     // Save configuration
-    sendRawCommand("mac save", response, sizeof(response));
+    sendRawLoraCommand("mac save", response, sizeof(response));
 
     // Attempt to join using ABP
-    sendRawCommand("mac join abp", response, sizeof(response));
+    sendRawLoraCommand("mac join abp", response, sizeof(response));
     vTaskDelay(pdMS_TO_TICKS(1000)); // 1-second delay
 
     // Check if the join was successful
@@ -134,7 +169,7 @@ bool initOTAA(const char *AppEUI, const char *AppKey, const char *DevEUI)
         ;
 
     // Reset the module
-    sendRawCommand("mac reset", response, sizeof(response));
+    sendRawLoraCommand("mac reset", response, sizeof(response));
 
     // Use given Device EUI or fetch from module
     if (strlen(DevEUI) == 16)
@@ -143,7 +178,7 @@ bool initOTAA(const char *AppEUI, const char *AppKey, const char *DevEUI)
     }
     else
     {
-        sendRawCommand("sys get hweui", _deveui, sizeof(_deveui));
+        sendRawLoraCommand("sys get hweui", _deveui, sizeof(_deveui));
         if (strlen(_deveui) != 16)
             return false; // Invalid response
     }
@@ -174,18 +209,14 @@ bool initOTAA(const char *AppEUI, const char *AppKey, const char *DevEUI)
     setAutomaticReply(false);
 
     // Save configuration
-    sendRawCommand("mac save", response, sizeof(response));
+    sendRawLoraCommand("mac save", response, sizeof(response));
 
     bool joined = false;
-
-    ESP_LOGI(TAG, "MADE IT TO FOR LOOP");
 
     // Try joining twice
     for (int i = 0; i < 2 && !joined; i++)
     {
-        ESP_LOGI(TAG, "IN FOR LOOP YAY");
-
-        sendRawCommand("mac join otaa", response, sizeof(response));
+        sendRawLoraCommand("mac join otaa", response, sizeof(response));
 
         if (strncmp(response, "accepted", 8) == 0)
         {
@@ -204,7 +235,7 @@ bool initOTAA(const char *AppEUI, const char *AppKey, const char *DevEUI)
 }
 
 // Function to send a command over UART and read the response
-bool sendRawCommand(const char *command, char *response, size_t response_size)
+bool sendRawLoraCommand(const char *command, char *response, size_t response_size)
 {
     ESP_LOGI(TAG, "SENDING COMMAND: %s", command);
     uart_write_bytes(LORA_UART_NUM, command, strlen(command));
@@ -216,6 +247,10 @@ bool sendRawCommand(const char *command, char *response, size_t response_size)
         response[length] = '\0'; // Null-terminate the response
         ESP_LOGI(TAG, "LoRa Response: %s", response);
         return true;
+    }
+    else
+    {
+        ESP_LOGI(TAG, "LoRa NO RESPONSE");
     }
     return false;
 }
@@ -261,19 +296,19 @@ bool setTXoutputPower(int pwridx)
     return sendMacSet("pwridx", pwrStr);
 }
 
-TX_RETURN_TYPE lora_tx(const char *data)
+TX_RETURN_TYPE loraTX(const char *data)
 {
-    return lora_txUncnf(data); // we are unsure which mode we're in. Better not to wait for acks.
+    return loraTXUncnf(data); // we are unsure which mode we're in. Better not to wait for acks.
 }
 
-TX_RETURN_TYPE lora_txCnf(const char *data)
+TX_RETURN_TYPE loraTXCnf(const char *data)
 {
-    return lora_txCommand("mac tx cnf 1 ", data);
+    return loraTXCommand("mac tx cnf 1 ", data);
 }
 
-TX_RETURN_TYPE lora_txUncnf(const char *data)
+TX_RETURN_TYPE loraTXUncnf(const char *data)
 {
-    return lora_txCommand("mac tx uncnf 1 ", data);
+    return loraTXCommand("mac tx uncnf 1 ", data);
 }
 
 LORA_RESPONSE_TYPE determineReceivedDataType(const char *receivedData)
@@ -388,7 +423,7 @@ void readUntilNewline(char *receivedData, int max_len)
     receivedData[index] = '\0'; // Null-terminate
 }
 
-void extract_rx_message(const char *receivedData, char *rxMessage, size_t rxMessageSize)
+void extractRXMessage(const char *receivedData, char *rxMessage, size_t rxMessageSize)
 {
     // Start searching from index 7
     const char *start = receivedData + 7;
@@ -411,7 +446,7 @@ void extract_rx_message(const char *receivedData, char *rxMessage, size_t rxMess
     }
 }
 
-TX_RETURN_TYPE lora_txCommand(const char *command, const char *data)
+TX_RETURN_TYPE loraTXCommand(const char *command, const char *data)
 {
     bool send_success = false;
     uint8_t busy_count = 0;
@@ -460,7 +495,7 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data)
             case MAC_RX:
             {
                 // example: mac_rx 1 54657374696E6720313233
-                extract_rx_message(receivedData, _rxMessage, sizeof(_rxMessage));
+                extractRXMessage(receivedData, _rxMessage, sizeof(_rxMessage));
                 send_success = true;
                 free(receivedData);
                 return TX_WITH_RX;
@@ -469,7 +504,7 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data)
             case MAC_ERR:
             {
                 free(receivedData);
-                lora_init();
+                loraInit();
                 break;
             }
 
@@ -493,7 +528,7 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data)
             {
                 free(receivedData);
                 // This should never happen. If it does, something major is wrong.
-                lora_init();
+                loraInit();
                 break;
             }
 
@@ -518,7 +553,7 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data)
         case NOT_JOINED:
         {
             free(receivedData);
-            lora_init();
+            loraInit();
             break;
         }
 
@@ -533,14 +568,14 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data)
         case SILENT:
         {
             free(receivedData);
-            lora_init();
+            loraInit();
             break;
         }
 
         case FRAME_COUNTER_ERR_REJOIN_NEEDED:
         {
             free(receivedData);
-            lora_init();
+            loraInit();
             break;
         }
 
@@ -556,7 +591,7 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data)
             // lorawan stack in the RN2xx3 hangs.
             if (busy_count >= 10)
             {
-                lora_init();
+                loraInit();
             }
             else
             {
@@ -568,7 +603,7 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data)
         case MAC_PAUSED:
         {
             free(receivedData);
-            lora_init();
+            loraInit();
             break;
         }
 
@@ -584,7 +619,7 @@ TX_RETURN_TYPE lora_txCommand(const char *command, const char *data)
         {
             free(receivedData);
             // unknown response after mac tx command
-            lora_init();
+            loraInit();
             break;
         }
         }
