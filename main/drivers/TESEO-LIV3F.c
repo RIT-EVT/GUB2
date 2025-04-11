@@ -27,7 +27,7 @@ Date & Time is on GPRMC. Find out how to get the nmea message, but only a single
 static const char *TAG = "TESEO_GPS";
 
 /* Setup UART */
-esp_err_t teseo_init(void)
+esp_err_t teseoInit(void)
 {
     // UART configuration
     const uart_config_t uart_config = {
@@ -46,13 +46,13 @@ esp_err_t teseo_init(void)
     // Install UART driver
     uart_driver_install(TESEO_UART_PORT, UART_BUFFER_SIZE, 0, 0, NULL, 0);
 
-    reset_teseo();
+    resetTeseo();
 
     ESP_LOGI(TAG, "TESEO GPS initialized over UART");
     return ESP_OK;
 }
 
-char get_checksum(const char *nmea_command)
+char getChecksum(const char *nmea_command)
 {
     char checksum = 0;
     for (int i = 0; nmea_command[i] != '\0'; i++)
@@ -62,9 +62,9 @@ char get_checksum(const char *nmea_command)
     return checksum;
 }
 
-void create_nmea(const char *nmea_command, char **formatted_command)
+void createNMEA(const char *nmea_command, char **formatted_command)
 {
-    char checksum = get_checksum(nmea_command);
+    char checksum = getChecksum(nmea_command);
 
     // Allocate memory for the full formatted NMEA string
     *formatted_command = (char *)malloc(strlen(nmea_command) + 10); // Extra space for $, *, checksum, \r\n, and null terminator
@@ -77,7 +77,7 @@ void create_nmea(const char *nmea_command, char **formatted_command)
     sprintf(*formatted_command, "$%s*%02X\r\n", nmea_command, checksum);
 }
 
-void reset_teseo()
+void resetTeseo()
 {
     gpio_reset_pin(PIN_NUM_GPS_RESET);
     /* Set the GPIO as a push/pull output */
@@ -91,10 +91,10 @@ void reset_teseo()
     vTaskDelay(pdMS_TO_TICKS(50));
 }
 
-esp_err_t teseo_uart_send(const char *nmea_com)
+esp_err_t teseoUartSend(const char *nmea_com)
 {
     char *nmea_command = NULL;
-    create_nmea(nmea_com, &nmea_command);
+    createNMEA(nmea_com, &nmea_command);
 
     int length = strlen(nmea_command);
     uart_write_bytes(TESEO_UART_PORT, nmea_command, length);
@@ -107,7 +107,7 @@ esp_err_t teseo_uart_send(const char *nmea_com)
 }
 
 // Read data from TESEO-LIV3F
-esp_err_t teseo_uart_read(void)
+esp_err_t teseoUartRead(void)
 {
     char data[UART_BUFFER_SIZE];
     int length = 0;
@@ -120,27 +120,27 @@ esp_err_t teseo_uart_read(void)
         // ESP_LOGI(TAG, "Received: %s", data);
 
         // Parse Response
-        parse_nmea(data);
+        parseNMEA(data);
     }
     return ESP_OK;
 }
 
-void request_gps_data()
+void requestGpsData()
 {
-    teseo_uart_send("PSTMNMEAREQUEST,0x12,0x2000");
+    teseoUartSend("PSTMNMEAREQUEST,0x12,0x2000");
 }
 
-void set_teseo_build()
+void setTeseoBuild()
 {
-    teseo_uart_send("PSTMSTANDBYENABLE,0");
-    teseo_uart_send("PSTMINITGPS,435.047,N,7740.545,W,0600,04,03,2025,01,36,02");
-    teseo_uart_send("PSTMSETPAR,1201,0x12"); // disable all lower 32 messages except GGA and VTG
-    // teseo_uart_send("$PSTMGETPAR,1201*21\r\n");
-    teseo_uart_send("PSTMSAVEPAR"); // Save it to non volatile memory
-    teseo_uart_send("PSTMSRR");     // reset it to activate the changes
+    teseoUartSend("PSTMSTANDBYENABLE,0");
+    teseoUartSend("PSTMINITGPS,435.047,N,7740.545,W,0600,04,03,2025,01,36,02");
+    teseoUartSend("PSTMSETPAR,1201,0x12"); // disable all lower 32 messages except GGA and VTG
+    // teseoUartSend("$PSTMGETPAR,1201*21\r\n");
+    teseoUartSend("PSTMSAVEPAR"); // Save it to non volatile memory
+    teseoUartSend("PSTMSRR");     // reset it to activate the changes
 }
 
-void parse_nmea(char *nmea)
+void parseNMEA(char *nmea)
 {
     ESP_LOGI(TAG, "\n\n\nParsing NMEA: %s\n\n\n", nmea);
     char *temp = strtok(nmea, "\n");
@@ -198,7 +198,7 @@ void parse_nmea(char *nmea)
     }
 }
 
-float convert_degrees(float nmea_coord)
+float convertDegrees(float nmea_coord)
 {
     int degrees = (int)(nmea_coord / 100); // Extract degrees
     float minutes = fmod(nmea_coord, 100); // Extract minutes
