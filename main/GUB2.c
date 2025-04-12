@@ -55,10 +55,10 @@ void GUBInit()
     esp_ipc_call_blocking(1, installGPIOISRService, 0);
     gpio_install_isr_service(0);
 
-    ESP_LOGD(TAG, "Starting CAN.");
+    // ESP_LOGD(TAG, "Starting CAN.");
     // CAN bus driver setup. Don't want to miss anything so do this first!
-    setupCANDriver(gubState.gubEvents, CAN_EVENT);
-    addCANBus(0, PIN_NUM_CAN_MC_CS, PIN_NUM_CAN_MC_RX_INT, PIN_NUM_CAN_MC_STB);
+    // setupCANDriver(gubState.gubEvents, CAN_EVENT);
+    // addCANBus(0, PIN_NUM_CAN_MC_CS, PIN_NUM_CAN_MC_RX_INT, PIN_NUM_CAN_MC_STB);
     // addCANBus(1, PIN_NUM_CAN_A_CS, PIN_NUM_CAN_A_RX_INT, PIN_NUM_CAN_A_STB);
 
     ESP_LOGI(TAG, "Initializing SD Card SPI bus");
@@ -91,8 +91,8 @@ void GUBInit()
 
     GUBInitLED();
 
-    teseo_init();
-    // lora_init();
+    // teseoInit();
+    loraInit();
 
     ESP_LOGI(TAG, "GUB Setup, starting main loop");
     xTaskCreate(GUBloop, "GUB", GUB_STACK_SIZE, NULL, 2, &gubState.mainTaskHandler);
@@ -103,7 +103,8 @@ void GUBInit()
  */
 void GUBloop(void *pvParam)
 {
-    // vTaskDelay(pdMS_TO_TICKS(300));
+    vTaskDelay(pdMS_TO_TICKS(300));
+    // loraAutobaud();
     // set_teseo_build();
     // vTaskDelay(pdMS_TO_TICKS(250));
     // teseo_uart_read();
@@ -122,6 +123,8 @@ void GUBloop(void *pvParam)
     //     ESP_LOGW("SysFact", "No response from LORA");
     // }
     int counter = 0;
+    char response[128];
+
     // teseo_uart_send("PSTMCOLD");
     // teseo_uart_read();
     // vTaskDelay(pdMS_TO_TICKS(250));
@@ -135,21 +138,22 @@ void GUBloop(void *pvParam)
         //     ESP_LOGW(TAG, "SD card not mounted! Attempting to remount...");
         //     GUBMountSDCard(SD_CARD_BASE_PATH);
         // }
-        if (counter % 1000 == 0)
+        if (counter == 25)
         {
-
-            //     uart_write_bytes(LORA_UART_NUM, "sys get ver\r\n", strlen("sys get ver\r\n"));
-            //     char res[64];
-            //     int len = uart_read_bytes(LORA_UART_NUM, (uint8_t *)res, sizeof(res) - 1, pdMS_TO_TICKS(1000));
-            //     if (len > 0)
-            //     {
-            //         res[len] = '\0';
-            //         ESP_LOGI("LoRa", "Response: %s", res);
-            //     }
-            //     else
-            //     {
-            //         ESP_LOGW("LoRa", "No response from LORA");
-            //     }
+            // sendRawLoraCommand("sys get ver", response, sizeof(response));
+            
+            uart_write_bytes(LORA_UART_NUM, "sys get ver\r\n", strlen("sys get ver\r\n"));
+            char res[64];
+            int len = uart_read_bytes(LORA_UART_NUM, (uint8_t *)res, sizeof(res) - 1, pdMS_TO_TICKS(1000));
+            if (len > 0)
+            {
+                res[len] = '\0';
+                ESP_LOGI("LoRa", "Response: %s", res);
+            }
+            else
+            {
+                ESP_LOGW("LoRa", "No response from LORA");
+            }
         }
         // canDriverUpdate();
         // canLoggerUpdate();
@@ -160,8 +164,8 @@ void GUBloop(void *pvParam)
         // }
 
         //* needed if not relying to the timeout of the queue
-        teseo_uart_read();
-
+        // teseo_uart_read();
+        vTaskDelay(pdMS_TO_TICKS(300));
         counter++;
     }
 }

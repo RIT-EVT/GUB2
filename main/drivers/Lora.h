@@ -8,13 +8,9 @@
 #include "esp_err.h"
 #include <string.h>
 #include "driver/uart.h"
+#include "GUB_Conf.h"
 
-#define LORA_UART_NUM UART_NUM_0
-#define LORA_UART_TX_PIN 18
-#define LORA_UART_RX_PIN 17
-#define LORA_RESET_PIN 1
-#define LORA_INT0_PIN 15
-#define LORA_INT1_PIN 8
+#define LORA_UART_NUM UART_NUM_1
 #define LORA_UART_BAUDRATE 57600
 #define UART_BUFFER_SIZE 1024
 

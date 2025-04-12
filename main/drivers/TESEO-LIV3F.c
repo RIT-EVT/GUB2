@@ -13,17 +13,6 @@ Date & Time is on GPRMC. Find out how to get the nmea message, but only a single
 
 #include "TESEO-LIV3F.h"
 
-// UART configuration
-
-#define TESEO_UART_PORT UART_NUM_2 // Using UART2
-#define TESEO_UART_RX_PIN 5        // The UART RX pin being used
-#define TESEO_UART_TX_PIN 4        // The UART TX pin being used
-#define TESEO_UART_BAUD_RATE 9600  // The UART baud rate
-#define UART_BUFFER_SIZE 1024      // Buffer size for incoming data
-#define GPIO_NUM_1 1
-#define GPIO_NUM_3 3
-#define PIN_NUM_GPS_RESET 9
-
 static const char *TAG = "TESEO_GPS";
 
 /* Setup UART */
@@ -79,15 +68,15 @@ void createNMEA(const char *nmea_command, char **formatted_command)
 
 void resetTeseo()
 {
-    gpio_reset_pin(PIN_NUM_GPS_RESET);
+    gpio_reset_pin(TESEO_RESET_PIN);
     /* Set the GPIO as a push/pull output */
-    gpio_set_direction(PIN_NUM_GPS_RESET, GPIO_MODE_OUTPUT);
+    gpio_set_direction(TESEO_RESET_PIN, GPIO_MODE_OUTPUT);
 
-    gpio_set_level(PIN_NUM_GPS_RESET, 0);
+    gpio_set_level(TESEO_RESET_PIN, 0);
 
     vTaskDelay(pdMS_TO_TICKS(50));
 
-    gpio_set_level(PIN_NUM_GPS_RESET, 1);
+    gpio_set_level(TESEO_RESET_PIN, 1);
     vTaskDelay(pdMS_TO_TICKS(50));
 }
 

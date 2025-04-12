@@ -20,7 +20,7 @@ void loraInit(void)
     loraUartInit();
     // loraPinReset();
     // loraJoinNetwork(OTAA);
-    loraAutobaud();
+    // loraAutobaud();
     ESP_LOGI(TAG, "LORA INITIALIZED");
 }
 
@@ -36,14 +36,8 @@ void loraAutobaud(void)
         vTaskDelay(pdMS_TO_TICKS(1000));
 
         // Send break signal
-        uart_write_bytes(LORA_UART_NUM, "\0\x55", 2);
-
-        // Send 0x55
-        // uint8_t fiftyFive = 0x55;
-        // uart_write_bytes(LORA_UART_NUM, (const char *)&fiftyFive, 1);
-
-        uart_write_bytes(LORA_UART_NUM, "\r\n", 2);
-
+        uart_write_bytes(LORA_UART_NUM, "\0\x55\r\n", 4);
+        vTaskDelay(pdMS_TO_TICKS(100));
         const char *command = "sys get ver\r\n";
         uart_write_bytes(LORA_UART_NUM, command, strlen(command));
 
