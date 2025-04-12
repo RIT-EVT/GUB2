@@ -9,7 +9,7 @@
 
 #define TESEO_UART_PORT UART_NUM_2 // Using UART2
 #define TESEO_UART_BAUD_RATE 9600  // The UART baud rate
-#define UART_BUFFER_SIZE 1024      // Buffer size for incoming data
+#define TESEO_UART_BUFFER_SIZE 1024      // Buffer size for incoming data
 #define GPIO_NUM_1 1
 #define GPIO_NUM_3 3
 
