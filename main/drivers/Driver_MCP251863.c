@@ -35,7 +35,7 @@ MCPError MCP251863DeviceSetup(MCP251XFD *dev, MCP251XFD_Config *conf, MCP251XFD_
         { 
             .Filter = MCP251XFD_FILTER0, 
             .EnableFilter = true, 
-            .Match = MCP251XFD_MATCH_ONLY_SID,
+            .Match = MCP251XFD_MATCH_SID_EID,
             .AcceptanceID = MCP251XFD_ACCEPT_ALL_MESSAGES, 
             .AcceptanceMask = MCP251XFD_ACCEPT_ALL_MESSAGES, 
             .PointTo = MCP251XFD_FIFO1, 
@@ -72,6 +72,13 @@ eERRORRESULT MCP251863DeviceInit(void *pIntDev, uint8_t chipSelect, const uint32
         .queue_size=7,              //We want to be able to queue 7 transactions at a time
         .pre_cb=NULL,               //Specify pre-transfer callback to handle D/C line
     };
+    
+
+    //check if bus is already initialized and re-initialize
+    if(*spiDevice){
+        ret = spi_bus_remove_device(*spiDevice);
+        ESP_ERROR_CHECK(ret);
+    }
 
     ret = spi_bus_add_device(CAN_SPI_HOST, &devCFG, spiDevice);
     ESP_ERROR_CHECK(ret);

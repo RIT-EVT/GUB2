@@ -40,7 +40,7 @@ static void CANDriverTask(void *arg) {
         } else {
             // get any events, wait until an even happens or 10ms without event
             activeEvents |=
-                xEventGroupWaitBits(driver.messageEvents, driver.deviceEventMask, true, false, portMAX_DELAY);
+                xEventGroupWaitBits(driver.messageEvents, driver.deviceEventMask, true, false, 100);
         }
 
         // read a message from each CAN bus that currently have messages
@@ -195,6 +195,8 @@ int addCANBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
         },
     };
 
+    ESP_LOGI("CAN", "Inializing CAN chip on bus %d", bus);
+
     // configure the interrupt pin
     gpio_config_t pinConf = {
         .mode = GPIO_MODE_INPUT,
@@ -222,6 +224,10 @@ int addCANBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
     eERRORRESULT ret;
     ret = MCP251863DeviceSetup(&dev->mcp251863, &MCP251863_CAN_conf, MCP251863_CAN_FIFO_Conf, CAN_FIFO_COUNT);
 
+    if(ret){
+        ShowDeviceError(ret);
+    }
+    
     // Unmask event
     driver.deviceEventMask |= (0x1 << bus);
     xEventGroupSetBits(driver.messageEvents, 1 << bus);

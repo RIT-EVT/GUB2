@@ -1,29 +1,23 @@
 /**
  * CAN pin defines
 */
-//Breadboard Test Setup
-#define CAN_SPI_HOST        SPI3_HOST
-#define PIN_NUM_CAN_MISO    37
-#define PIN_NUM_CAN_MOSI    35
-#define PIN_NUM_CAN_CLK     36
-#define PIN_NUM_CAN1_CS     45
-#define PIN_NUM_CAN1_RX_INT 42
-#define PIN_NUM_CAN1_STB    5       // Can be -1 for unused
 
 // Real GUB pins
-// CAN A
-// #define CAN_SPI_HOST        SPI3_HOST
-// #define PIN_NUM_CAN_MISO    13
-// #define PIN_NUM_CAN_MOSI    11
-// #define PIN_NUM_CAN_CLK     12
-// #define PIN_NUM_CAN1_CS      10
-// #define PIN_NUM_CAN1_RX_INT  17
-// #define PIN_NUM_CAN1_STB     16
+// CAN SPI
+#define CAN_SPI_HOST        SPI3_HOST
+#define PIN_NUM_CAN_MISO    13
+#define PIN_NUM_CAN_MOSI    11
+#define PIN_NUM_CAN_CLK     12
+
+//CAN A
+#define PIN_NUM_CAN_A_CS      10
+#define PIN_NUM_CAN_A_RX_INT  17
+#define PIN_NUM_CAN_A_STB     16
 
 // CAN MC
-// #define PIN_NUM_CAN2_CS      14
-// #define PIN_NUM_CAN2_RX_INT  5
-// #define PIN_NUM_CAN2_STB     4
+#define PIN_NUM_CAN_MC_CS      14
+#define PIN_NUM_CAN_MC_RX_INT  5
+#define PIN_NUM_CAN_MC_STB     4
 
 /**
  * CAN configuration defines
@@ -34,7 +28,7 @@
 #define CAN_NOMINAL_BITRATE 500000      /* 500 Kbps*/
 #define CAN_DATA_BITRATE    1000000     /* 1   Mbps*/
 
-#define CAN_BUS_COUNT           1 
+#define CAN_BUS_COUNT           2 
 #define CAN_BUFFER_SIZE         100      // ESP message buffer size
 #define CAN_MAX_MESSAGE_SIZE    8       // max can message payload size of 8 bytes used to 
                                         // preallocate memory for the payload data
@@ -42,21 +36,14 @@
 /**
  * SD card pin defines
 */
-//Breadboard Test Setup
-#define SD_SPI_HOST         SPI2_HOST
-#define PIN_NUM_SD_MISO     9
-#define PIN_NUM_SD_MOSI     10
-#define PIN_NUM_SD_CLK      11
-#define PIN_NUM_SD_CS       12
-#define PIN_NUM_SD_CD       13
 
 // Real GUB pins
-// #define SD_SPI_HOST         SPI2_HOST
-// #define PIN_NUM_SD_MISO     37
-// #define PIN_NUM_SD_MOSI     35
-// #define PIN_NUM_SD_CLK      36
-// #define PIN_NUM_SD_CS       21
-// #define PIN_NUM_SD_CD       SDSPI_SLOT_NO_CD
+#define SD_SPI_HOST         SPI2_HOST
+#define PIN_NUM_SD_MISO     37
+#define PIN_NUM_SD_MOSI     35
+#define PIN_NUM_SD_CLK      36
+#define PIN_NUM_SD_CS       21
+#define PIN_NUM_SD_CD       SDSPI_SLOT_NO_CD
 
 /**
  * SD card configuration defines
@@ -78,13 +65,8 @@
  * Generic IO pin defines
 */
 
-//Breadboard Test Setup 
-#define PIN_NUM_HEARTBEAT   48
-#define LED_IS_NEOPIXEL     1
-
 // Real GUB pins
-// #define PIN_NUM_HEARTBEAT   2
-// #define LED_IS_NEOPIXEL     0
+#define PIN_NUM_HEARTBEAT   2
 
 #define HEARTBEAT_LED_PERIOD    100 * 1000 //100ms
 
