@@ -299,7 +299,6 @@ static esp_err_t delete_post_handler(httpd_req_t *req)
 static esp_err_t restart_post_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "Restarting!");
-    esp_restart();
 
     /* Redirect onto root */
     httpd_resp_set_status(req, "303 See Other");
@@ -308,6 +307,7 @@ static esp_err_t restart_post_handler(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Connection", "close");
 #endif
     httpd_resp_sendstr(req, "File deleted successfully");
+    esp_restart();
     return ESP_OK;
 }
 

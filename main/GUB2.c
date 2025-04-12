@@ -57,10 +57,17 @@ void GUBInit()
 
     // ESP_LOGD(TAG, "Starting CAN.");
     // CAN bus driver setup. Don't want to miss anything so do this first!
-    // setupCANDriver(gubState.gubEvents, CAN_EVENT);
-    // addCANBus(0, PIN_NUM_CAN_MC_CS, PIN_NUM_CAN_MC_RX_INT, PIN_NUM_CAN_MC_STB);
-    // addCANBus(1, PIN_NUM_CAN_A_CS, PIN_NUM_CAN_A_RX_INT, PIN_NUM_CAN_A_STB);
+    setupCANDriver(gubState.gubEvents, CAN_EVENT);
 
+    // For some reason, the second BUS initialization messes up the first one
+    // still not really sure why
+    // The fix is just to re-initialize the first bus, also not really sure why
+    // this works 
+    addCANBus(1, PIN_NUM_CAN_A_CS, PIN_NUM_CAN_A_RX_INT, PIN_NUM_CAN_A_STB);
+    addCANBus(0, PIN_NUM_CAN_MC_CS, PIN_NUM_CAN_MC_RX_INT, PIN_NUM_CAN_MC_STB);
+    addCANBus(1, PIN_NUM_CAN_A_CS, PIN_NUM_CAN_A_RX_INT, PIN_NUM_CAN_A_STB);
+
+    
     ESP_LOGI(TAG, "Initializing SD Card SPI bus");
     spi_bus_config_t sdBusCFG = {
         .mosi_io_num = PIN_NUM_SD_MOSI,
