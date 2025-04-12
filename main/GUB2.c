@@ -123,7 +123,6 @@ void GUBloop(void *pvParam)
     //     ESP_LOGW("SysFact", "No response from LORA");
     // }
     int counter = 0;
-    char response[128];
 
     // teseo_uart_send("PSTMCOLD");
     // teseo_uart_read();
@@ -138,7 +137,7 @@ void GUBloop(void *pvParam)
         //     ESP_LOGW(TAG, "SD card not mounted! Attempting to remount...");
         //     GUBMountSDCard(SD_CARD_BASE_PATH);
         // }
-        if (counter == 25)
+        if (counter % 10 == 0)
         {
             // sendRawLoraCommand("sys get ver", response, sizeof(response));
             

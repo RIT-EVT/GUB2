@@ -17,6 +17,10 @@ static bool _otaa = false;
 
 void loraInit(void)
 {
+    gpio_reset_pin(LORA_RESET_PIN);
+    gpio_set_direction(LORA_RESET_PIN, GPIO_MODE_OUTPUT);
+    loraPinReset();
+    
     loraUartInit();
     // loraPinReset();
     // loraJoinNetwork(OTAA);
@@ -53,10 +57,6 @@ void loraAutobaud(void)
 
 void loraPinReset(void)
 {
-    gpio_reset_pin(LORA_RESET_PIN);
-
-    gpio_set_direction(LORA_RESET_PIN, GPIO_MODE_OUTPUT);
-
     gpio_set_level(LORA_RESET_PIN, 0);
     vTaskDelay(pdMS_TO_TICKS(50));
     gpio_set_level(LORA_RESET_PIN, 1);
