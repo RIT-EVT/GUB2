@@ -91,7 +91,7 @@ void GUBInit()
 
     GUBInitLED();
 
-    // teseoInit();
+    teseoInit();
     loraInit();
 
     ESP_LOGI(TAG, "GUB Setup, starting main loop");
@@ -139,6 +139,7 @@ void GUBloop(void *pvParam)
         // }
         if (counter % 10 == 0)
         {
+            teseoUartRead();
             // sendRawLoraCommand("sys get ver", response, sizeof(response));
             
             uart_write_bytes(LORA_UART_NUM, "sys get ver\r\n", strlen("sys get ver\r\n"));
@@ -163,7 +164,6 @@ void GUBloop(void *pvParam)
         // }
 
         //* needed if not relying to the timeout of the queue
-        // teseo_uart_read();
         vTaskDelay(pdMS_TO_TICKS(300));
         counter++;
     }
