@@ -18,6 +18,18 @@ static const char *TAG = "TESEO_GPS";
 /* Setup UART */
 esp_err_t teseoInit(void)
 {
+    teseoUartInit();
+
+    gpio_reset_pin(TESEO_RESET_PIN);
+    gpio_set_direction(TESEO_RESET_PIN, GPIO_MODE_OUTPUT);
+
+    resetTeseo();
+
+    ESP_LOGI(TAG, "TESEO GPS initialized over UART");
+    return ESP_OK;
+}
+
+void teseoUartInit(void) {
     // UART configuration
     const uart_config_t uart_config = {
         .baud_rate = TESEO_UART_BAUD_RATE,
@@ -33,12 +45,7 @@ esp_err_t teseoInit(void)
     uart_set_pin(TESEO_UART_PORT, TESEO_UART_TX_PIN, TESEO_UART_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
     // Install UART driver
-    uart_driver_install(TESEO_UART_PORT, UART_BUFFER_SIZE, 0, 0, NULL, 0);
-
-    resetTeseo();
-
-    ESP_LOGI(TAG, "TESEO GPS initialized over UART");
-    return ESP_OK;
+    uart_driver_install(TESEO_UART_PORT, TESEO_UART_BUFFER_SIZE, 0, 0, NULL, 0);
 }
 
 char getChecksum(const char *nmea_command)
@@ -68,14 +75,8 @@ void createNMEA(const char *nmea_command, char **formatted_command)
 
 void resetTeseo()
 {
-    gpio_reset_pin(TESEO_RESET_PIN);
-    /* Set the GPIO as a push/pull output */
-    gpio_set_direction(TESEO_RESET_PIN, GPIO_MODE_OUTPUT);
-
     gpio_set_level(TESEO_RESET_PIN, 0);
-
     vTaskDelay(pdMS_TO_TICKS(50));
-
     gpio_set_level(TESEO_RESET_PIN, 1);
     vTaskDelay(pdMS_TO_TICKS(50));
 }
@@ -98,7 +99,7 @@ esp_err_t teseoUartSend(const char *nmea_com)
 // Read data from TESEO-LIV3F
 esp_err_t teseoUartRead(void)
 {
-    char data[UART_BUFFER_SIZE];
+    char data[TESEO_UART_BUFFER_SIZE];
     int length = 0;
 
     // read data from UART

@@ -20,11 +20,8 @@ void loraInit(void)
     gpio_reset_pin(LORA_RESET_PIN);
     gpio_set_direction(LORA_RESET_PIN, GPIO_MODE_OUTPUT);
     loraPinReset();
-    
+
     loraUartInit();
-    // loraPinReset();
-    // loraJoinNetwork(OTAA);
-    // loraAutobaud();
     ESP_LOGI(TAG, "LORA INITIALIZED");
 }
 
@@ -79,7 +76,7 @@ esp_err_t loraUartInit(void)
     uart_set_pin(LORA_UART_NUM, LORA_UART_TX_PIN, LORA_UART_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
     // Install UART driver
-    uart_driver_install(LORA_UART_NUM, UART_BUFFER_SIZE, 0, 0, NULL, 0);
+    uart_driver_install(LORA_UART_NUM, LORA_UART_BUFFER_SIZE, 0, 0, NULL, 0);
 
     ESP_LOGI("UART_INIT", "UART initialized for LORA");
     return ESP_OK;

@@ -17,6 +17,7 @@
 esp_err_t teseoInit(void);
 esp_err_t teseoUartSend(const char *nmea_command);
 esp_err_t teseoUartRead(void);
+void teseoUartInit(void);
 void parseNMEA(char *nmea);
 void resetTeseo();
 char createChecksum(const char *nmea_command);
