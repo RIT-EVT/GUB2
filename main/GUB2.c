@@ -150,7 +150,7 @@ void GUBloop(void *pvParam)
         {
             teseoUartRead();
             // sendRawLoraCommand("sys get ver", response, sizeof(response));
-                    }
+        }
         // canDriverUpdate();
         // canLoggerUpdate();
 
