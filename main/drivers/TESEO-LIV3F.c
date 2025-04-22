@@ -16,8 +16,7 @@ Date & Time is on GPRMC. Find out how to get the nmea message, but only a single
 static const char *TAG = "TESEO_GPS";
 
 /* Setup UART */
-esp_err_t teseoInit(void)
-{
+esp_err_t teseoInit(void) {
     teseoUartInit();
 
     gpio_reset_pin(TESEO_RESET_PIN);
@@ -27,6 +26,36 @@ esp_err_t teseoInit(void)
 
     ESP_LOGI(TAG, "TESEO GPS initialized over UART");
     return ESP_OK;
+}
+
+void factoryResetGPS(void) {
+    teseoUartSend("PSTMRESTOREPAR");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+}
+
+void coldStartGPS(void) {
+    // stop the engine
+    teseoUartSend("PSTMGPSSUSPEND");
+
+    // set the UART message list
+    teseoUartSend("PSTMCFGMSGL,0,1,0x18004F,0x0");
+    vTaskDelay(pdMS_TO_TICKS(500));
+    
+    // disable the eco-ing message
+    teseoUartSend("PSTMSETPAR,1227,1,2");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // restart the engine
+    teseoUartSend("PSTMGPSRESTART");
+    vTaskDelay(pdMS_TO_TICKS(1500));
+}
+
+void startGPS(void) {
+    teseoUartSend("PSTMGPSSUSPEND");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // restart the engine
+    teseoUartSend("PSTMGPSRESTART");
 }
 
 void teseoUartInit(void) {
@@ -73,7 +102,7 @@ void createNMEA(const char *nmea_command, char **formatted_command)
     sprintf(*formatted_command, "$%s*%02X\r\n", nmea_command, checksum);
 }
 
-void resetTeseo()
+void resetTeseo(void)
 {
     gpio_set_level(TESEO_RESET_PIN, 0);
     vTaskDelay(pdMS_TO_TICKS(50));
@@ -89,8 +118,8 @@ esp_err_t teseoUartSend(const char *nmea_com)
     int length = strlen(nmea_command);
     uart_write_bytes(TESEO_UART_PORT, nmea_command, length);
     ESP_LOGI(TAG, "Sent: '%s'", nmea_command);
-    char response[1024];
-    uart_read_bytes(TESEO_UART_PORT, response, sizeof(response), pdMS_TO_TICKS(1000));
+
+    teseoUartRead();
 
     free(nmea_command);
     return ESP_OK;
@@ -115,17 +144,22 @@ esp_err_t teseoUartRead(void)
     return ESP_OK;
 }
 
-void requestGpsData()
+void requestGpsData(void)
 {
     teseoUartSend("PSTMNMEAREQUEST,0x12,0x2000");
 }
 
-void setTeseoBuild()
+void setTeseoBuild(void)
 {
     teseoUartSend("PSTMSTANDBYENABLE,0");
     teseoUartSend("PSTMINITGPS,435.047,N,7740.545,W,0600,04,03,2025,01,36,02");
     teseoUartSend("PSTMSETPAR,1201,0x12"); // disable all lower 32 messages except GGA and VTG
     // teseoUartSend("$PSTMGETPAR,1201*21\r\n");
+    saveTeseoBuild();
+}
+
+void saveTeseoBuild(void)
+{
     teseoUartSend("PSTMSAVEPAR"); // Save it to non volatile memory
     teseoUartSend("PSTMSRR");     // reset it to activate the changes
 }
