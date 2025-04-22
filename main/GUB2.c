@@ -57,15 +57,15 @@ void GUBInit()
 
     // ESP_LOGD(TAG, "Starting CAN.");
     // CAN bus driver setup. Don't want to miss anything so do this first!
-    setupCANDriver(gubState.gubEvents, CAN_EVENT);
+    // setupCANDriver(gubState.gubEvents, CAN_EVENT);
 
     // For some reason, the second BUS initialization messes up the first one
     // still not really sure why
     // The fix is just to re-initialize the first bus, also not really sure why
     // this works 
-    addCANBus(1, PIN_NUM_CAN_A_CS, PIN_NUM_CAN_A_RX_INT, PIN_NUM_CAN_A_STB);
-    addCANBus(0, PIN_NUM_CAN_MC_CS, PIN_NUM_CAN_MC_RX_INT, PIN_NUM_CAN_MC_STB);
-    addCANBus(1, PIN_NUM_CAN_A_CS, PIN_NUM_CAN_A_RX_INT, PIN_NUM_CAN_A_STB);
+    // addCANBus(1, PIN_NUM_CAN_A_CS, PIN_NUM_CAN_A_RX_INT, PIN_NUM_CAN_A_STB);
+    // addCANBus(0, PIN_NUM_CAN_MC_CS, PIN_NUM_CAN_MC_RX_INT, PIN_NUM_CAN_MC_STB);
+    // addCANBus(1, PIN_NUM_CAN_A_CS, PIN_NUM_CAN_A_RX_INT, PIN_NUM_CAN_A_STB);
 
     
     ESP_LOGI(TAG, "Initializing SD Card SPI bus");
@@ -99,7 +99,7 @@ void GUBInit()
     GUBInitLED();
 
     teseoInit();
-    loraInit();
+    // loraInit();
 
     ESP_LOGI(TAG, "GUB Setup, starting main loop");
     xTaskCreate(GUBloop, "GUB", GUB_STACK_SIZE, NULL, 2, &gubState.mainTaskHandler);
@@ -110,7 +110,6 @@ void GUBInit()
  */
 void GUBloop(void *pvParam)
 {
-    vTaskDelay(pdMS_TO_TICKS(300));
     // loraAutobaud();
     // set_teseo_build();
     // vTaskDelay(pdMS_TO_TICKS(250));
@@ -130,6 +129,9 @@ void GUBloop(void *pvParam)
     //     ESP_LOGW("SysFact", "No response from LORA");
     // }
     int counter = 0;
+    // factoryResetGPS();
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+    coldStartGPS();
 
     // teseo_uart_send("PSTMCOLD");
     // teseo_uart_read();
@@ -148,20 +150,7 @@ void GUBloop(void *pvParam)
         {
             teseoUartRead();
             // sendRawLoraCommand("sys get ver", response, sizeof(response));
-            
-            uart_write_bytes(LORA_UART_NUM, "sys get ver\r\n", strlen("sys get ver\r\n"));
-            char res[64];
-            int len = uart_read_bytes(LORA_UART_NUM, (uint8_t *)res, sizeof(res) - 1, pdMS_TO_TICKS(1000));
-            if (len > 0)
-            {
-                res[len] = '\0';
-                ESP_LOGI("LoRa", "Response: %s", res);
-            }
-            else
-            {
-                ESP_LOGW("LoRa", "No response from LORA");
-            }
-        }
+                    }
         // canDriverUpdate();
         // canLoggerUpdate();
 

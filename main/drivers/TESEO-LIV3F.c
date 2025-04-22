@@ -40,7 +40,7 @@ void coldStartGPS(void) {
     // set the UART message list
     teseoUartSend("PSTMCFGMSGL,0,1,0x18004F,0x0");
     vTaskDelay(pdMS_TO_TICKS(500));
-    
+
     // disable the eco-ing message
     teseoUartSend("PSTMSETPAR,1227,1,2");
     vTaskDelay(pdMS_TO_TICKS(1000));
