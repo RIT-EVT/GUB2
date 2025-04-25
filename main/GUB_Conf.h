@@ -59,7 +59,7 @@
  */
 #define TESEO_UART_RX_PIN 5
 #define TESEO_UART_TX_PIN 4
-#define TESEO_RESET_PIN 9
+#define TESEO_RESET_PIN 16
 
 /**
  * SD card configuration defines
