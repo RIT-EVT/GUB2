@@ -99,6 +99,8 @@ void GUBInit()
     GUBInitLED();
 
     teseoInit();
+    // gpio_set_level(TESEO_RESET_PIN, 0); // SILENCES ONBOARD GPS FOR EXTERNAL GPS USE
+
     // loraInit();
 
     ESP_LOGI(TAG, "GUB Setup, starting main loop");
@@ -129,12 +131,16 @@ void GUBloop(void *pvParam)
     //     ESP_LOGW("SysFact", "No response from LORA");
     // }
     int counter = 0;
-    // factoryResetGPS();
-    // vTaskDelay(pdMS_TO_TICKS(1000));
-    coldStartGPS();
+    factoryResetGPS();
+    silenceMessagesGPS();
+    vTaskDelay(pdMS_TO_TICKS(1000));
 
+    teseoUartRead();
+    teseoUartRead();
+
+    srrGPS();
     // teseo_uart_send("PSTMCOLD");
-    // teseo_uart_read();
+    teseoUartRead();
     // vTaskDelay(pdMS_TO_TICKS(250));
     // teseo_uart_send("PSTMINITGPS,435.047,N,7740.545,W,0600,04,03,2025,01,36,02");
     while (true)
@@ -146,11 +152,14 @@ void GUBloop(void *pvParam)
         //     ESP_LOGW(TAG, "SD card not mounted! Attempting to remount...");
         //     GUBMountSDCard(SD_CARD_BASE_PATH);
         // }
-        if (counter % 10 == 0)
+        if (counter % 5 == 0)
         {
+
             teseoUartRead();
+            teseoUartSend("PSTMGETSWVER,255");
             // sendRawLoraCommand("sys get ver", response, sizeof(response));
         }
+
         // canDriverUpdate();
         // canLoggerUpdate();
 
