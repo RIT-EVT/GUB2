@@ -7,6 +7,11 @@
 
 #include <esp_log.h>
 #include <driver/spi_master.h>
+#include "sdmmc_cmd.h"
+#include "driver/sdmmc_host.h"
+#include "driver/sdmmc_defs.h"
+#include "driver/sdmmc_types.h"
+
 #include <esp_vfs_fat.h>
 #include <esp_timer.h>
 
@@ -65,28 +70,39 @@ void GUBInit(){
     addCANBus(1, PIN_NUM_CAN_A_CS, PIN_NUM_CAN_A_RX_INT, PIN_NUM_CAN_A_STB);
 
     
-    ESP_LOGI(TAG, "Initializing SD Card SPI bus");
-    spi_bus_config_t sdBusCFG = {
-        .mosi_io_num = PIN_NUM_SD_MOSI,
-        .miso_io_num = PIN_NUM_SD_MISO,
-        .sclk_io_num = PIN_NUM_SD_CLK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .max_transfer_sz = 4092,
-    };
-    
-    //initialize SPI bus
-    esp_err_t ret;
-    ret = spi_bus_initialize(SD_SPI_HOST, &sdBusCFG, SDSPI_DEFAULT_DMA);
-    if (ret == ESP_OK) {
+    #ifdef SD_USING_SDIO
+        ESP_LOGI(TAG, "Initializing SD Card SDIO bus");
         int r = GUBMountSDCard(SD_CARD_BASE_PATH);
+        
         ESP_LOGI("SD_CARD", "SD card initialized with status %d", r);
         if(!r){
             sdmmc_card_print_info(stdout, gubState.SDcard);
         }
-    } else {
-        ESP_LOGE(TAG, "Failed to initialize bus.");
-    }
+
+    #else
+        ESP_LOGI(TAG, "Initializing SD Card SPI bus");
+        spi_bus_config_t sdBusCFG = {
+            .mosi_io_num = PIN_NUM_SD_MOSI,
+            .miso_io_num = PIN_NUM_SD_MISO,
+            .sclk_io_num = PIN_NUM_SD_CLK,
+            .quadwp_io_num = -1,
+            .quadhd_io_num = -1,
+            .max_transfer_sz = 4092,
+        };
+        
+        //initialize SPI bus
+        esp_err_t ret;
+        ret = spi_bus_initialize(SD_SPI_HOST, &sdBusCFG, SDSPI_DEFAULT_DMA);
+        if (ret == ESP_OK) {
+            int r = GUBMountSDCard(SD_CARD_BASE_PATH);
+            ESP_LOGI("SD_CARD", "SD card initialized with status %d", r);
+            if(!r){
+                sdmmc_card_print_info(stdout, gubState.SDcard);
+            }
+        } else {
+            ESP_LOGE(TAG, "Failed to initialize bus.");
+        }
+    #endif
 
     listDir(SD_CARD_BASE_PATH);
 
@@ -214,24 +230,43 @@ int GUBMountSDCard(const char* basePath){
     esp_vfs_fat_mount_config_t mountConfig = {
         .format_if_mount_failed = false,
         .max_files = MAX_FILE_HANDLERS,
-        .allocation_unit_size = 0
+        .allocation_unit_size = 0       // Ignored if format_if_mount_failed is false
     };
-    sdmmc_host_t host = SDSPI_HOST_DEFAULT();
-    host.slot = SD_SPI_HOST;
 
-    gubState.sdCardState = SD_NOT_MOUNTED;
+    #ifdef SD_USING_SDIO
+        sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+        gubState.sdCardState = SD_NOT_MOUNTED;
 
-    //initialize the SDCard slot
-    sdspi_device_config_t slotConfig = SDSPI_DEVICE_CONFIG_DEFAULT();
-    slotConfig.gpio_cs = PIN_NUM_SD_CS;
-    slotConfig.host_id = SD_SPI_HOST;
-    slotConfig.gpio_cd = PIN_NUM_SD_CD;
-    ret = esp_vfs_fat_sdspi_mount(basePath, &host, &slotConfig, &mountConfig, &gubState.SDcard);
+        //initialize the SDCard slot
+        sdmmc_slot_config_t slotConfig = SDMMC_SLOT_CONFIG_DEFAULT();
+        slotConfig.width = 4;
+        slotConfig.clk = SD_PIN_CLK;
+        slotConfig.cmd = SD_PIN_CMD;
+        slotConfig.d0 = SD_PIN_D0;
+        slotConfig.d1 = SD_PIN_D1;
+        slotConfig.d2 = SD_PIN_D2;
+        slotConfig.d3 = SD_PIN_D3;
+
+        ret = esp_vfs_fat_sdmmc_mount(basePath, &host, &slotConfig, &mountConfig, &gubState.SDcard);
+    #else
+    /////// OLD SPI SLOT CONFIG SETUP ///////
+        sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+        host.slot = SD_SPI_HOST;
+        
+        gubState.sdCardState = SD_NOT_MOUNTED;
+
+        //initialize the SDCard slot
+        sdspi_device_config_t slotConfig = SDSPI_DEVICE_CONFIG_DEFAULT();
+        slotConfig.gpio_cs = PIN_NUM_SD_CS;
+        slotConfig.host_id = SD_SPI_HOST;
+        slotConfig.gpio_cd = PIN_NUM_SD_CD;
+        ret = esp_vfs_fat_sdspi_mount(basePath, &host, &slotConfig, &mountConfig, &gubState.SDcard);
+    #endif
 
     if (ret != ESP_OK){
         if (ret == ESP_FAIL) {
             ESP_LOGE(TAG, "Failed to mount filesystem. "
-                "If you want the card to be formatted, set the EXAMPLE_FORMAT_IF_MOUNT_FAILED menuconfig option.");
+                "If you want the card to be formatted, set the format_if_mount_failed to true in mountConfig.");
         } else {
             ESP_LOGE(TAG, "Failed to initialize the card (%s). "
                 "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(ret));
