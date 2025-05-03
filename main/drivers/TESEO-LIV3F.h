@@ -20,13 +20,14 @@ esp_err_t teseoUartRead(void);
 void teseoUartInit(void);
 void parseNMEA(char *nmea);
 void resetTeseo(void);
-void coldStartGPS(void);
-void startGPS(void);
+void silenceMessagesGPS(void);
+void restartGPS(void);
 void factoryResetGPS(void);
 char createChecksum(const char *nmea_command);
 void createNMEA(const char *nmea_command, char **formatted_command);
 void requestGpsData(void);
 void setTeseoBuild(void);
+void srrGPS(void);
 void saveTeseoBuild(void);
 float convertDegrees(float nmea_coord);
 

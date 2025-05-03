@@ -2,6 +2,10 @@
 can be done with gpgga (everything but speed) and gpvtg (speed)
 
 Date & Time is on GPRMC. Find out how to get the nmea message, but only a single time
+
+DOES NOT CURRENTLY WORK... The liv3fl chip (the one that is standalone) autostarts the gps properly and works with no outside influence,
+but the one on the GUB is liv3f and seemingly doesn't. The liv3fl does data dumps on start up that the liv3f doesn't do, 
+which are probably needed... There is a windows-only program "Teseo Suite Pro" to use the gps module easier.
 */
 
 #include <string.h>
@@ -33,24 +37,28 @@ void factoryResetGPS(void) {
     vTaskDelay(pdMS_TO_TICKS(1000));
 }
 
-void coldStartGPS(void) {
+void silenceMessagesGPS(void) {
     // stop the engine
     teseoUartSend("PSTMGPSSUSPEND");
 
     // set the UART message list
-    teseoUartSend("PSTMCFGMSGL,0,1,0x18004F,0x0");
+    teseoUartSend("PSTMCFGMSGL,0,0,0,0x0");
     vTaskDelay(pdMS_TO_TICKS(500));
 
     // disable the eco-ing message
-    teseoUartSend("PSTMSETPAR,1227,1,2");
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    // teseoUartSend("PSTMSETPAR,1227,1,2");
+    // vTaskDelay(pdMS_TO_TICKS(1000));
 
     // restart the engine
     teseoUartSend("PSTMGPSRESTART");
     vTaskDelay(pdMS_TO_TICKS(1500));
 }
 
-void startGPS(void) {
+void srrGPS(void) {
+    teseoUartSend("PSTMSRR");
+}
+
+void restartGPS(void) {
     teseoUartSend("PSTMGPSSUSPEND");
     vTaskDelay(pdMS_TO_TICKS(1000));
 
