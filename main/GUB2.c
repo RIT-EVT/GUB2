@@ -132,12 +132,12 @@ void GUBloop(void *pvParam){
 
         canDriverUpdate();
         canLoggerUpdate();
-        
+
         CANMessage_t message;
         if(receiveCANMessage(&message, pdMS_TO_TICKS(5))){
             canLoggerProcessMessage(&message);
         }
-        
+
         //* needed if not relying to the timeout of the queue
         // vTaskDelay(pdMS_TO_TICKS(5));
     }
