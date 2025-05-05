@@ -11,12 +11,12 @@
 
 //CAN A
 #define PIN_NUM_CAN_A_CS      10
-#define PIN_NUM_CAN_A_RX_INT  17
+#define PIN_NUM_CAN_A_RX_INT  47    // 50/50 this and MC_RX_INT need to be swapped
 #define PIN_NUM_CAN_A_STB     16
 
 // CAN MC
 #define PIN_NUM_CAN_MC_CS      14
-#define PIN_NUM_CAN_MC_RX_INT  5
+#define PIN_NUM_CAN_MC_RX_INT  48   // 50/50 this and A_RX_INT need to be swapped
 #define PIN_NUM_CAN_MC_STB     4
 
 /**
