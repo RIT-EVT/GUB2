@@ -218,6 +218,7 @@ void printGUBStatus(){
 /**
  * Mount the SD card
  * @param basePath the file base file path to mount the sd card to
+ * @return ESP_OK (0) if successful, else ESP error message
 */
 int GUBMountSDCard(const char* basePath){
     ESP_LOGI(TAG, "Initializing SD Card");
