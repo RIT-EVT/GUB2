@@ -11,12 +11,12 @@
 
 //CAN A
 #define PIN_NUM_CAN_A_CS      10
-#define PIN_NUM_CAN_A_RX_INT  17
+#define PIN_NUM_CAN_A_RX_INT  48
 #define PIN_NUM_CAN_A_STB     16
 
 // CAN MC
 #define PIN_NUM_CAN_MC_CS      14
-#define PIN_NUM_CAN_MC_RX_INT  5
+#define PIN_NUM_CAN_MC_RX_INT  47
 #define PIN_NUM_CAN_MC_STB     4
 
 /**
@@ -36,14 +36,24 @@
 /**
  * SD card pin defines
 */
+#define SD_USING_SDIO
 
 // Real GUB pins
+// SPI pins
 #define SD_SPI_HOST         SPI2_HOST
 #define PIN_NUM_SD_MISO     37
 #define PIN_NUM_SD_MOSI     35
 #define PIN_NUM_SD_CLK      36
 #define PIN_NUM_SD_CS       21
 #define PIN_NUM_SD_CD       SDSPI_SLOT_NO_CD
+
+// SDIO pins
+#define SD_PIN_CLK      35
+#define SD_PIN_CMD      36
+#define SD_PIN_D0       6
+#define SD_PIN_D1       21
+#define SD_PIN_D2       38
+#define SD_PIN_D3       37
 
 /**
  * SD card configuration defines
