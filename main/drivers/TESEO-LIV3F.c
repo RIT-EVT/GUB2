@@ -3,8 +3,8 @@ can be done with gpgga (everything but speed) and gpvtg (speed)
 
 Date & Time is on GPRMC. Find out how to get the nmea message, but only a single time
 
-DOES NOT CURRENTLY WORK... The liv3fl chip (the one that is standalone) autostarts the gps properly and works with no outside influence,
-but the one on the GUB is liv3f and seemingly doesn't. The liv3fl does data dumps on start up that the liv3f doesn't do, 
+WORKS ONLY ON BREADBOARD SETUP... The liv3fl chip (the one that is standalone) autostarts the gps properly and works with no outside influence,
+but the one on the GUB custom PCB is liv3f and seemingly doesn't. The liv3fl does data dumps on start up that the liv3f doesn't do, 
 which are probably needed... There is a windows-only program "Teseo Suite Pro" to use the gps module easier.
 */
 
@@ -174,58 +174,76 @@ void saveTeseoBuild(void)
 
 void parseNMEA(char *nmea)
 {
-    ESP_LOGI(TAG, "\n\n\nParsing NMEA: %s\n\n\n", nmea);
+    // Log raw NMEA Output
+    // ESP_LOGI(TAG, "\n\n\nParsing NMEA: %s\n\n\n", nmea);
     char *temp = strtok(nmea, "\n");
     while (temp != NULL)
     {
-        // if (strncmp(temp, "$GPGGA", 6) == 0)
-        // {
-        //     char *token = strtok(temp, ",");
-        //     int field = 0;
-        //     float latitude = 0.0, longitude = 0.0, time = 0.0;
-        //     while (token != NULL)
-        //     {
-        //         field++;
-        //         if (field == 2)
-        //         { // Time
-        //             time = atof(token);
-        //         }
-        //         else if (field == 3)
-        //         { // Latitude
-        //             latitude = atof(token);
-        //         }
-        //         else if (field == 5)
-        //         { // Longitude
-        //             longitude = atof(token);
-        //         }
-        //         token = strtok(NULL, ",");
-        //     }
+        float latitude = 0.0, longitude = 0.0, time = 0.0;
+        int quality = 0;
+        char latDir = '-', longDir = '-';
+        if (strncmp(temp, "$GPGGA", 6) == 0)
+        {
+            // $GPGGA,TIME,LATITUDE,LAT_DIRECTION,LONGITUDE,LONG_DIR,GPS_QUAL,#_SATS,HORZ_DILUTION,ALTITUDE,ALT_UNITS,UNDULATION,UND_UNITS,AGE_OF_CORRECTION,BASE_STATION_ID*CHECKSUM
+            char *token = strtok(temp, ",");
+            int field = 0;
+            while (token != NULL)
+            {
+                field++;
+                if (field == 2)
+                { // Time
+                    time = atof(token);
+                }
+                else if (field == 3)
+                { // Latitude
+                    latitude = atof(token);
+                }
+                else if (field == 4)
+                { // Latitude Direction (N or S)
+                    latDir = token[0];
+                }
+                else if (field == 5)
+                { // Longitude
+                    longitude = atof(token);
+                }
+                else if (field == 6)
+                { // Longitude Direction (W or E)
+                    longDir = token[0];
+                }
+                else if (field == 7)
+                { // Connection Quality
+                    quality = atoi(token);
+                }
 
-        //     ESP_LOGI(TAG, "Parsed GPGGA: Time = %f, Latitude = %f, Longitude = %f\n\n\n\n", time, convert_degrees(latitude), convert_degrees(longitude));
-        // } else if (strncmp(temp, "$GPVTG", 6) == 0) {
-        //     char *token = strtok(temp, ",");
-        //     int field = 0;
-        //     float true_track = 0.0, speed_kmh = 0.0;
-        //     while (token != NULL)
-        //     {
-        //         field++;
-        //         if (field == 2)
-        //         { // Time
-        //             time = atof(token);
-        //         }
-        //         else if (field == 3)
-        //         { // Latitude
-        //             latitude = atof(token);
-        //         }
-        //         else if (field == 8)
-        //         { // Speed in km/h
-        //            speed_kmh = atof(token);
-        //         }
-        //         token = strtok(NULL, ",");
-        //     }
+                token = strtok(NULL, ",");
+            }
 
-        // ESP_LOGI(TAG, "Parsed GPVTG: True Track = %.2f°, Speed = %.2f km/h\n\n\n\n", true_track, speed_kmh);
-        // }
+            ESP_LOGI("", "%f %c, %f %c at qual %d", convertDegrees(latitude), latDir, convertDegrees(longitude), longDir, quality);
+        } else if (strncmp(temp, "$GPVTG", 6) == 0) {
+            // $GPVTG,TRUE_TRACK,TRUE_TRACK_INDICATOR,MAG_TRACK,MAG_TRACK_UNIT,SPEED_OVER_GROUND,NAUTICAL_SPEED_UNIT,SPEED,SPEED_UNIT,MODE_ID*CHECKSUM
+            char *token = strtok(temp, ",");
+            int field = 0;
+            float true_track = 0.0, speed_kmh = 0.0;
+            while (token != NULL)
+            {
+                field++;
+                if (field == 2)
+                { // Time
+                    time = atof(token);
+                }
+                else if (field == 3)
+                { // Latitude
+                    latitude = atof(token);
+                }
+                else if (field == 8)
+                { // Speed in km/h
+                   speed_kmh = atof(token);
+                }
+                token = strtok(NULL, ",");
+            }
+
+        ESP_LOGI(TAG, "Parsed GPVTG: True Track = %.2f°, Speed = %.2f km/h", true_track, speed_kmh);
+        }
         temp = strtok(NULL, "\n");
     }
 }

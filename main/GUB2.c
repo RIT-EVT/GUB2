@@ -39,7 +39,7 @@ void GUBInit()
     gubState.gubEvents = xEventGroupCreate();
 
     // setup CAN SPI bus
-    ESP_LOGD(TAG, "Setting up CAN SPI bus");
+    // ESP_LOGD(TAG, "Setting up CAN SPI bus");
 
     spi_bus_config_t canBuscfg = {
         .miso_io_num = PIN_NUM_CAN_MISO,
@@ -68,15 +68,15 @@ void GUBInit()
     // addCANBus(1, PIN_NUM_CAN_A_CS, PIN_NUM_CAN_A_RX_INT, PIN_NUM_CAN_A_STB);
 
     
-    ESP_LOGI(TAG, "Initializing SD Card SPI bus");
-    spi_bus_config_t sdBusCFG = {
-        .mosi_io_num = PIN_NUM_SD_MOSI,
-        .miso_io_num = PIN_NUM_SD_MISO,
-        .sclk_io_num = PIN_NUM_SD_CLK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .max_transfer_sz = 4092,
-    };
+    // ESP_LOGI(TAG, "Initializing SD Card SPI bus");
+    // spi_bus_config_t sdBusCFG = {
+    //     .mosi_io_num = PIN_NUM_SD_MOSI,
+    //     .miso_io_num = PIN_NUM_SD_MISO,
+    //     .sclk_io_num = PIN_NUM_SD_CLK,
+    //     .quadwp_io_num = -1,
+    //     .quadhd_io_num = -1,
+    //     .max_transfer_sz = 4092,
+    // };
 
     // //initialize SPI bus
     // esp_err_t ret;
@@ -131,15 +131,10 @@ void GUBloop(void *pvParam)
     //     ESP_LOGW("SysFact", "No response from LORA");
     // }
     int counter = 0;
-    factoryResetGPS();
-    silenceMessagesGPS();
+    // silenceMessagesGPS();
     vTaskDelay(pdMS_TO_TICKS(1000));
 
     teseoUartRead();
-    teseoUartRead();
-
-    srrGPS();
-    // teseo_uart_send("PSTMCOLD");
     teseoUartRead();
     // vTaskDelay(pdMS_TO_TICKS(250));
     // teseo_uart_send("PSTMINITGPS,435.047,N,7740.545,W,0600,04,03,2025,01,36,02");
@@ -154,9 +149,8 @@ void GUBloop(void *pvParam)
         // }
         if (counter % 5 == 0)
         {
-
             teseoUartRead();
-            teseoUartSend("PSTMGETSWVER,255");
+            // teseoUartSend("PSTMGETSWVER,255");
             // sendRawLoraCommand("sys get ver", response, sizeof(response));
         }
 
@@ -169,7 +163,7 @@ void GUBloop(void *pvParam)
         // }
 
         //* needed if not relying to the timeout of the queue
-        vTaskDelay(pdMS_TO_TICKS(300));
+        vTaskDelay(pdMS_TO_TICKS(100));
         counter++;
     }
 }
