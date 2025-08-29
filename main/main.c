@@ -178,12 +178,12 @@ void app_main(void)
     while (1)
     {
         // Print Task information if debugging
-        // if(LOG_LOCAL_LEVEL >= ESP_LOG_DEBUG){
-        //     printTaskStats(pdMS_TO_TICKS(1000), false);
-        //     //print GUB Stats
-        //     printGUBStatus();
-        // } else {
+        if(LOG_LOCAL_LEVEL >= ESP_LOG_DEBUG){
+            printTaskStats(pdMS_TO_TICKS(1000), false);
+            // print GUB Stats
+            printGUBStatus();
+        } else {
             vTaskDelay(pdMS_TO_TICKS(1000));
-        // }
+        }
     }
 }

@@ -41,19 +41,19 @@ void GUBInit()
     // setup CAN SPI bus
     // ESP_LOGD(TAG, "Setting up CAN SPI bus");
 
-    spi_bus_config_t canBuscfg = {
-        .miso_io_num = PIN_NUM_CAN_MISO,
-        .mosi_io_num = PIN_NUM_CAN_MOSI,
-        .sclk_io_num = PIN_NUM_CAN_CLK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .max_transfer_sz = 0};
+    // spi_bus_config_t canBuscfg = {
+    //     .miso_io_num = PIN_NUM_CAN_MISO,
+    //     .mosi_io_num = PIN_NUM_CAN_MOSI,
+    //     .sclk_io_num = PIN_NUM_CAN_CLK,
+    //     .quadwp_io_num = -1,
+    //     .quadhd_io_num = -1,
+    //     .max_transfer_sz = 0};
 
-    ESP_ERROR_CHECK(spi_bus_initialize(CAN_SPI_HOST, &canBuscfg, SPI_DMA_CH_AUTO));
+    // ESP_ERROR_CHECK(spi_bus_initialize(CAN_SPI_HOST, &canBuscfg, SPI_DMA_CH_AUTO));
 
     // Install GPIO service on Core 1, all gpio isr handlers will be processed on core 1.
-    esp_ipc_call_blocking(1, installGPIOISRService, 0);
-    gpio_install_isr_service(0);
+    // esp_ipc_call_blocking(1, installGPIOISRService, 0);
+    // gpio_install_isr_service(0);
 
     // ESP_LOGD(TAG, "Starting CAN.");
     // CAN bus driver setup. Don't want to miss anything so do this first!
@@ -67,7 +67,7 @@ void GUBInit()
     // addCANBus(0, PIN_NUM_CAN_MC_CS, PIN_NUM_CAN_MC_RX_INT, PIN_NUM_CAN_MC_STB);
     // addCANBus(1, PIN_NUM_CAN_A_CS, PIN_NUM_CAN_A_RX_INT, PIN_NUM_CAN_A_STB);
 
-    
+
     // ESP_LOGI(TAG, "Initializing SD Card SPI bus");
     // spi_bus_config_t sdBusCFG = {
     //     .mosi_io_num = PIN_NUM_SD_MOSI,
@@ -78,7 +78,7 @@ void GUBInit()
     //     .max_transfer_sz = 4092,
     // };
 
-    // //initialize SPI bus
+    //initialize SPI bus
     // esp_err_t ret;
     // ret = spi_bus_initialize(SD_SPI_HOST, &sdBusCFG, SDSPI_DEFAULT_DMA);
     // if (ret == ESP_OK) {
@@ -93,7 +93,7 @@ void GUBInit()
 
     // listDir(SD_CARD_BASE_PATH);
 
-    // //start up logger
+    //start up logger
     // canLoggerInit();
 
     GUBInitLED();
@@ -163,7 +163,7 @@ void GUBloop(void *pvParam)
         // }
 
         //* needed if not relying to the timeout of the queue
-        vTaskDelay(pdMS_TO_TICKS(100));
+        // vTaskDelay(pdMS_TO_TICKS(100));
         counter++;
     }
 }

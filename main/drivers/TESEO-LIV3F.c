@@ -1,7 +1,8 @@
 /*
 can be done with gpgga (everything but speed) and gpvtg (speed)
 
-Date & Time is on GPRMC. Find out how to get the nmea message, but only a single time
+Date & Time is on GPRMC. GPRMC also has lat, long, speed in knots. might be able to do only GPRMC and get all the info we want.
+Find out how to get the nmea message, but only a single time
 
 WORKS ONLY ON BREADBOARD SETUP... The liv3fl chip (the one that is standalone) autostarts the gps properly and works with no outside influence,
 but the one on the GUB custom PCB is liv3f and seemingly doesn't. The liv3fl does data dumps on start up that the liv3f doesn't do, 
