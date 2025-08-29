@@ -46,15 +46,6 @@
 #define PIN_NUM_SD_CD       SDSPI_SLOT_NO_CD
 
 /**
- * LORA configuration defines
- */
-#define LORA_UART_TX_PIN 17
-#define LORA_UART_RX_PIN 18
-#define LORA_RESET_PIN 1
-#define LORA_INT0_PIN 15
-#define LORA_INT1_PIN 8
-
-/**
  * TESEO GPS configuration defines
  */
 #define TESEO_UART_RX_PIN 5

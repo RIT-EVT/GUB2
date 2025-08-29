@@ -8,7 +8,6 @@ set(SOURCES
     "drivers/Driver_MCP251863.c" 
     "drivers/CANDriver.c"
     "drivers/TESEO-LIV3F.c"
-    "drivers/Lora.c"
 )
 
 
