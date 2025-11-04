@@ -13,12 +13,29 @@ static CANDriver_t driver;
  * The ISR handler for the INT1 pin of device triggered on rising edge
  * @param arg The can bus number
  */
-void IRAM_ATTR CANDriverISRHandler(void *arg) {
+void CANDriverISRHandler(void *arg) {
     uint32_t bus = (uint32_t)arg;
 
     // set the corrsponding event to chip with data (this basically defers
     // the SPI reading to a later time that is not in an interrupt).
-    xEventGroupSetBitsFromISR(driver.messageEvents, 1 << bus, pdTRUE);
+    BaseType_t xHigherPriorityTaskWoken, xResult;
+    xHigherPriorityTaskWoken = pdFALSE;
+
+    xResult = xEventGroupSetBitsFromISR(driver.messageEvents, 1 << bus, &xHigherPriorityTaskWoken);
+    if( xResult != pdFAIL )
+    {
+
+        /* If xHigherPriorityTaskWoken is now set to pdTRUE then a context
+
+           switch should be requested. The macro used is port specific and will
+
+           be either portYIELD_FROM_ISR() or portEND_SWITCHING_ISR() - refer to
+
+           the documentation page for the port being used. */
+
+        portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
+
+    }
 }
 
 /**
@@ -272,7 +289,7 @@ CANDeviceStatistic_t getCANStatistics(int bus, bool clear) {
  * @param msg the message to print
  */
 void printCANMessage(CANMessage_t const *msg) {
-    printf(LOG_COLOR(LOG_COLOR_PURPLE) "Message on bus #%u ID: 0x%08" PRIx32 " with %d bytes of data: ", msg->bus,
+    printf(LOG_ANSI_COLOR_BOLD(LOG_ANSI_COLOR_RED) "Message on bus #%u ID: 0x%08" PRIx32 " with %d bytes of data: ", msg->bus,
            msg->ID, msg->DLC);
     for (int i = 0; i < msg->DLC; i++) {
         printf("0x%X ", msg->payload[i]);
@@ -292,9 +309,9 @@ void printCANDriverState() {
         CANDeviceStatistic_t busStats = getCANStatistics(i, true);
         printf("\t| %3d | %7lu | %s%8lu" LOG_RESET_COLOR " | %s%8lu" LOG_RESET_COLOR " | %s%7lu" LOG_RESET_COLOR
                " |\r\n",
-               i, busStats.messageReceiveCount, busStats.fifoErrorCount ? LOG_BOLD(LOG_COLOR_RED) : "",
-               busStats.fifoErrorCount, busStats.receiveBufferFullCount ? LOG_BOLD(LOG_COLOR_RED) : "",
-               busStats.receiveBufferFullCount, busStats.communicationErrorCount ? LOG_BOLD(LOG_COLOR_RED) : "",
+               i, busStats.messageReceiveCount, busStats.fifoErrorCount ? LOG_ANSI_COLOR_BOLD(LOG_ANSI_COLOR_RED) : "",
+               busStats.fifoErrorCount, busStats.receiveBufferFullCount ? LOG_ANSI_COLOR_BOLD(LOG_ANSI_COLOR_RED) : "",
+               busStats.receiveBufferFullCount, busStats.communicationErrorCount ? LOG_ANSI_COLOR_BOLD(LOG_ANSI_COLOR_RED) : "",
                busStats.communicationErrorCount);
     }
 }
