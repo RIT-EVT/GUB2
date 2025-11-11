@@ -1,5 +1,7 @@
 ## IDF Component Manager Manifest File
 dependencies:
+  espressif/zlib: "^1.3.0"
+  espressif/expat: "^2.7.0"
   espressif/led_strip: "^2.5.1"
   ## Required IDF version
   idf:
