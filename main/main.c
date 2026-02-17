@@ -150,14 +150,14 @@ void app_main(void)
     // Start of main program, reduce logging info
     ESP_LOGI(TAG, "Starting GUB2");
     ESP_LOGD(TAG, "Debug logging Enabled");
-    reduceLogging();
+    //reduceLogging();
 
     // Create default event loop needed by the  main app
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     
     // Uncomment if the board is crashing and you are having a hard time 
     // getting a debug session connected. 
-    // vTaskDelay(pdMS_TO_TICKS(1000));
+    //vTaskDelay(pdMS_TO_TICKS(1000));
     
     ESP_LOGD(TAG, "Initializing GUB");
     GUBInit();
@@ -175,15 +175,17 @@ void app_main(void)
     start_file_server(SD_CARD_BASE_PATH);
 
     //main loop, not much here since most stuff is handled through the GUB task that can leverage both cores
+
     while (1)
     {
+        //vTaskDelay(pdMS_TO_TICKS(1000));
         // Print Task information if debugging
+        printTaskStats(pdMS_TO_TICKS(1000), false);
+        printGUBStatus();
         if(LOG_LOCAL_LEVEL >= ESP_LOG_DEBUG){
-            printTaskStats(pdMS_TO_TICKS(1000), false);
+
             //print GUB Stats
-            printGUBStatus();
-        } else {
-            vTaskDelay(pdMS_TO_TICKS(1000));
+            //
         }
     }
 }

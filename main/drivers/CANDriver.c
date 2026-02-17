@@ -3,7 +3,7 @@
 #include <esp_log.h>
 #include <string.h>
 
-#define CAN_STACK_SIZE 2048 // Minimum
+#define CAN_STACK_SIZE 4096 // Minimum
 
 static const char *TAG = "CANDriver";
 
@@ -18,7 +18,39 @@ void IRAM_ATTR CANDriverISRHandler(void *arg) {
 
     // set the corrsponding event to chip with data (this basically defers
     // the SPI reading to a later time that is not in an interrupt).
-    xEventGroupSetBitsFromISR(driver.messageEvents, 1 << bus, pdTRUE);
+    BaseType_t xHigherPriorityTaskWoken, xResult;
+    xHigherPriorityTaskWoken = pdFALSE;
+
+    xResult = xQueueSendFromISR(driver.messageEvents, &bus, &xHigherPriorityTaskWoken);
+    if( xResult != pdFAIL )
+    {
+
+        /* If xHigherPriorityTaskWoken is now set to pdTRUE then a context
+
+           switch should be requested. */
+
+        portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
+
+    }
+}
+
+static eERRORRESULT chip_check_fifo(CANDevice_t *dev, eMCP251XFD_FIFOstatus *status) {
+    eERRORRESULT ErrorExt1 =
+        MCP251XFD_GetFIFOStatus(&dev->mcp251863, MCP251XFD_FIFO1, status); // First get FIFO1 status
+    if (ErrorExt1 != ERR_OK) {
+        ESP_LOGE(TAG, "Error getting FIFO Status %d", ErrorExt1);
+    }
+    return ErrorExt1;
+
+}
+
+static eERRORRESULT chip_get_message(CANDevice_t *dev, MCP251XFD_CANMessage *message) {
+    eERRORRESULT ErrorExt1 =
+                MCP251XFD_ReceiveMessageFromFIFO(&dev->mcp251863, message, CAN_RX_PAYLOAD, NULL, MCP251XFD_FIFO1);
+    if (ErrorExt1 != ERR_OK) {
+        ESP_LOGE(TAG, "Error reading chip message %d", ErrorExt1);
+    }
+    return ErrorExt1;
 }
 
 /**
@@ -26,97 +58,68 @@ void IRAM_ATTR CANDriverISRHandler(void *arg) {
  * @param arg UNUSED (part to FreeRTOS spec)
  */
 static void CANDriverTask(void *arg) {
-    EventBits_t activeEvents = 0;
+    ESP_LOGI(TAG, "CANDriver task is ready");
+    uint8_t commErrorCount = 0;
+    uint8_t messageCount = 0;
+    uint8_t commBufferErrorCount = 0;
+    uint8_t rtosQueueFullCount = 0;
 
-    // wait until the mask has at least on bit set
-    while (!driver.deviceEventMask)
-        vTaskDelay(1);
+    uint32_t busSelect = 0;
 
-    for (;;) {
-        // determine which bus has just got data
-        if (activeEvents) {
-            // get any additional events while there are still messages in the FIFO
-            activeEvents |= xEventGroupClearBits(driver.messageEvents, driver.deviceEventMask);
-        } else {
-            // get any events, wait until an even happens or 10ms without event
-            activeEvents |=
-                xEventGroupWaitBits(driver.messageEvents, driver.deviceEventMask, true, false, 100);
-        }
-
-        // read a message from each CAN bus that currently have messages
-        for (int i = 0; activeEvents >> i && i < CAN_BUS_COUNT; i++) {
-            // skip chips without any messages
-            if (((activeEvents >> i) & 0x1) == 0) {
-                continue;
-            }
-
-            CANDevice_t *dev = &driver.devices[i];
-            eERRORRESULT ErrorExt1 = ERR_OK;
-
-            //* Device Status Checking
-            // get FIFO status to determine if there is still a message
+    while (1) {
+        commErrorCount = 0;
+        messageCount = 0;
+        commBufferErrorCount = 0;
+        rtosQueueFullCount = 0;
+        if (xQueueReceive(driver.messageEvents, &busSelect, portMAX_DELAY) == pdTRUE) {
+            ESP_LOGI(TAG, "CAN Driver Receive Task started: busSelect: %d", busSelect);
+            // There is a new CAN message on the chip indicated by busSelect
+            // Loop over this chip's FIFO until there are no new messages
             eMCP251XFD_FIFOstatus FIFOstatus = 0;
-            ErrorExt1 =
-                MCP251XFD_GetFIFOStatus(&dev->mcp251863, MCP251XFD_FIFO1, &FIFOstatus); // First get FIFO1 status
-            if (ErrorExt1 != ERR_OK) {
-                ESP_LOGE(TAG, "Error getting FIFO Status %d", ErrorExt1);
-                xSemaphoreTake(dev->statsMutex, portMAX_DELAY);
-                dev->stats.communicationErrorCount++;
-                xSemaphoreGive(dev->statsMutex);
-                continue;
+            CANDevice_t *dev = &driver.devices[busSelect];
+            chip_check_fifo(dev, &FIFOstatus);
+            ESP_LOGI(TAG, "Status: %d", FIFOstatus);
+            while (chip_check_fifo(dev, &FIFOstatus) && FIFOstatus == MCP251XFD_RX_FIFO_NOT_EMPTY) {
+                ESP_LOGI(TAG, "CAN Driver Receive Task: Got a message!!");
+                // Begin loop for reading a single message out of this chip's queue
+                CANMessage_t receivedMessage;
+                MCP251XFD_CANMessage tempMessage;
+                // set the payload of the MCP251XFD struct to our CANMessage struct to avoid a memcpy
+                tempMessage.PayloadData = &receivedMessage.payload[0];
+                if (chip_get_message(dev, &tempMessage) != ERR_OK) {
+                    ++commErrorCount;
+                }
+                receivedMessage.bus = busSelect;
+                receivedMessage.DLC =
+                    MCP251XFD_DLCToByte(tempMessage.DLC, tempMessage.ControlFlags & MCP251XFD_CANFD_FRAME);
+                receivedMessage.ID = tempMessage.MessageID;
+                receivedMessage.SEQ = tempMessage.MessageSEQ;
+                receivedMessage.timestamp = esp_timer_get_time();
+                // if (FIFOstatus & MCP251XFD_RX_FIFO_OVERFLOW) {
+                //     ++commBufferErrorCount;
+                //     MCP251863ClearFIFOOverflowFlag(&dev->mcp251863, MCP251XFD_FIFO1);
+                // }
+                if (xQueueSend(driver.messageBuffer, &receivedMessage, pdMS_TO_TICKS(10)) == pdTRUE) {
+                    ++messageCount;
+                }
+                else {
+                    ++rtosQueueFullCount;
+                }
             }
-
-            // Stop processing messages from a chip if there are no messages
-            if (!(FIFOstatus & MCP251XFD_RX_FIFO_NOT_EMPTY)) {
-                activeEvents &= ~(0x1 << i);
-                continue;
-            }
-
-            //* Message Processing
-            // There is atleast one message in the FIFO so read it
-            // uint8_t RxPayloadData[CAN_RX_PAYLOAD_SIZE];
-            CANMessage_t receivedMessage;
-            MCP251XFD_CANMessage tempMessage;
-            // set the payload of the MCP251XFD struct to our CANMessage struct to avoid a memcpy
-            tempMessage.PayloadData = &receivedMessage.payload[0];
-
-            // Receive the message from the FIFO
-            ErrorExt1 =
-                MCP251XFD_ReceiveMessageFromFIFO(&dev->mcp251863, &tempMessage, CAN_RX_PAYLOAD, NULL, MCP251XFD_FIFO1);
-            if (ErrorExt1 != ERR_OK) {
-                xSemaphoreTake(dev->statsMutex, portMAX_DELAY);
-                dev->stats.communicationErrorCount++;
-                xSemaphoreGive(dev->statsMutex);
-                continue;
-            }
-
-            receivedMessage.bus = i;
-            receivedMessage.DLC =
-                MCP251XFD_DLCToByte(tempMessage.DLC, tempMessage.ControlFlags & MCP251XFD_CANFD_FRAME);
-            receivedMessage.ID = tempMessage.MessageID;
-            receivedMessage.SEQ = tempMessage.MessageSEQ;
-            receivedMessage.timestamp = esp_timer_get_time();
-
-            //? Is there a slim possibility of deadlock? Possibly need to be very careful with taking the 
-            //? Semaphore elsewhere then waiting to receive a message
+            // Attempt to update buffer counts after we have read all messages
             xSemaphoreTake(dev->statsMutex, portMAX_DELAY);
-            if (FIFOstatus & MCP251XFD_RX_FIFO_OVERFLOW) {
-                dev->stats.fifoErrorCount++;
-                MCP251863ClearFIFOOverflowFlag(&dev->mcp251863, MCP251XFD_FIFO1);
-            }
-
-            if (!xQueueSend(driver.messageBuffer, &receivedMessage, pdMS_TO_TICKS(1))) {
-
-                dev->stats.receiveBufferFullCount++;
-                xSemaphoreGive(dev->statsMutex);
-                continue;
-            }
-            dev->stats.messageReceiveCount++;
+            dev->stats.communicationErrorCount += commErrorCount;
+            dev->stats.fifoErrorCount += commBufferErrorCount;
+            dev->stats.receiveBufferFullCount += rtosQueueFullCount;
+            dev->stats.messageReceiveCount += messageCount;
             xSemaphoreGive(dev->statsMutex);
 
-            xEventGroupSetBits(driver.globalEvents, driver.messageFlag);
         }
+
+        ESP_LOGI(TAG, "End of recieve task iteration");
     }
+
+
 }
 
 /**
@@ -127,7 +130,7 @@ static void CANDriverTask(void *arg) {
 void setupCANDriver(EventGroupHandle_t globalEvents, uint16_t messageFlag) {
     // setup message queue
     driver.messageBuffer = xQueueCreate(CAN_BUFFER_SIZE, sizeof(CANMessage_t));
-    driver.messageEvents = xEventGroupCreate();
+    driver.messageEvents = xQueueCreate(10, sizeof(uint32_t));
     driver.globalEvents = globalEvents;
     driver.messageFlag = messageFlag;
 
@@ -230,7 +233,7 @@ int addCANBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
     
     // Unmask event
     driver.deviceEventMask |= (0x1 << bus);
-    xEventGroupSetBits(driver.messageEvents, 1 << bus);
+    //xEventGroupSetBits(driver.messageEvents, 1 << bus);
 
     return ret;
 }
@@ -272,7 +275,7 @@ CANDeviceStatistic_t getCANStatistics(int bus, bool clear) {
  * @param msg the message to print
  */
 void printCANMessage(CANMessage_t const *msg) {
-    printf(LOG_COLOR(LOG_COLOR_PURPLE) "Message on bus #%u ID: 0x%08" PRIx32 " with %d bytes of data: ", msg->bus,
+    printf(LOG_ANSI_COLOR_BOLD(LOG_ANSI_COLOR_RED) "Message on bus #%u ID: 0x%08" PRIx32 " with %d bytes of data: ", msg->bus,
            msg->ID, msg->DLC);
     for (int i = 0; i < msg->DLC; i++) {
         printf("0x%X ", msg->payload[i]);
@@ -292,9 +295,9 @@ void printCANDriverState() {
         CANDeviceStatistic_t busStats = getCANStatistics(i, true);
         printf("\t| %3d | %7lu | %s%8lu" LOG_RESET_COLOR " | %s%8lu" LOG_RESET_COLOR " | %s%7lu" LOG_RESET_COLOR
                " |\r\n",
-               i, busStats.messageReceiveCount, busStats.fifoErrorCount ? LOG_BOLD(LOG_COLOR_RED) : "",
-               busStats.fifoErrorCount, busStats.receiveBufferFullCount ? LOG_BOLD(LOG_COLOR_RED) : "",
-               busStats.receiveBufferFullCount, busStats.communicationErrorCount ? LOG_BOLD(LOG_COLOR_RED) : "",
+               i, busStats.messageReceiveCount, busStats.fifoErrorCount ? LOG_ANSI_COLOR_BOLD(LOG_ANSI_COLOR_RED) : "",
+               busStats.fifoErrorCount, busStats.receiveBufferFullCount ? LOG_ANSI_COLOR_BOLD(LOG_ANSI_COLOR_RED) : "",
+               busStats.receiveBufferFullCount, busStats.communicationErrorCount ? LOG_ANSI_COLOR_BOLD(LOG_ANSI_COLOR_RED) : "",
                busStats.communicationErrorCount);
     }
 }

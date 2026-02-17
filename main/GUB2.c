@@ -57,7 +57,7 @@ void GUBInit(){
     esp_ipc_call_blocking(1, installGPIOISRService, 0);
     gpio_install_isr_service(0);
     
-    ESP_LOGD(TAG, "Starting CAN.");
+    ESP_LOGI(TAG, "Starting CAN.");
     // CAN bus driver setup. Don't want to miss anything so do this first!
     setupCANDriver(gubState.gubEvents, CAN_EVENT);
 
