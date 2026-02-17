@@ -79,7 +79,7 @@ static void CANDriverTask(void *arg) {
             CANDevice_t *dev = &driver.devices[busSelect];
             chip_check_fifo(dev, &FIFOstatus);
             ESP_LOGI(TAG, "Status: %d", FIFOstatus);
-            while (chip_check_fifo(dev, &FIFOstatus) && FIFOstatus == MCP251XFD_RX_FIFO_NOT_EMPTY) {
+            while (chip_check_fifo(dev, &FIFOstatus) && FIFOstatus & MCP251XFD_RX_FIFO_NOT_EMPTY) {
                 ESP_LOGI(TAG, "CAN Driver Receive Task: Got a message!!");
                 // Begin loop for reading a single message out of this chip's queue
                 CANMessage_t receivedMessage;
