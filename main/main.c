@@ -175,6 +175,9 @@ void app_main(void)
     start_file_server(SD_CARD_BASE_PATH);
 
     //main loop, not much here since most stuff is handled through the GUB task that can leverage both cores
+#ifndef RUNTIME_DEBUG
+    reduceLogging();
+#endif
 
     while (1)
     {
