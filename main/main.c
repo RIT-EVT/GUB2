@@ -157,7 +157,7 @@ void app_main(void)
     
     // Uncomment if the board is crashing and you are having a hard time 
     // getting a debug session connected. 
-    //vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(5000));
     
     ESP_LOGD(TAG, "Initializing GUB");
     GUBInit();
@@ -178,7 +178,7 @@ void app_main(void)
 
     while (1)
     {
-        //vTaskDelay(pdMS_TO_TICKS(1000));
+#ifdef RUNTIME_DEBUG
         // Print Task information if debugging
         printTaskStats(pdMS_TO_TICKS(1000), false);
         printGUBStatus();
@@ -187,5 +187,8 @@ void app_main(void)
             //print GUB Stats
             //
         }
+#else
+        vTaskDelay(pdMS_TO_TICKS(1000));
+#endif
     }
 }

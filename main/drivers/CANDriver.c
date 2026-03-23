@@ -8,6 +8,7 @@
 static const char *TAG = "CANDriver";
 
 static CANDriver_t driver;
+static bool enabled = false;
 
 /**
  * The ISR handler for the INT1 pin of device triggered on rising edge
@@ -54,7 +55,7 @@ static eERRORRESULT chip_get_message(CANDevice_t *dev, MCP251XFD_CANMessage *mes
 }
 
 /**
- * The FreeRTOS task for reading
+ * The FreeRTOS task for reading messages from the CAN Bus
  * @param arg UNUSED (part to FreeRTOS spec)
  */
 static void CANDriverTask(void *arg) {
@@ -72,14 +73,19 @@ static void CANDriverTask(void *arg) {
         commBufferErrorCount = 0;
         rtosQueueFullCount = 0;
         if (xQueueReceive(driver.messageEvents, &busSelect, portMAX_DELAY) == pdTRUE) {
-            ESP_LOGI(TAG, "CAN Driver Receive Task started: busSelect: %d", busSelect);
+            for (int i = 0; i < CAN_BUS_COUNT; i++) {
+                if (!enabled) {
+                continue;
+            }
+
+            ESP_LOGI(TAG, "CAN Driver Receive Task started: busSelect: %d", i);
             // There is a new CAN message on the chip indicated by busSelect
             // Loop over this chip's FIFO until there are no new messages
             eMCP251XFD_FIFOstatus FIFOstatus = 0;
-            CANDevice_t *dev = &driver.devices[busSelect];
+            CANDevice_t *dev = &driver.devices[i];
             chip_check_fifo(dev, &FIFOstatus);
             ESP_LOGI(TAG, "Status: %d", FIFOstatus);
-            while (chip_check_fifo(dev, &FIFOstatus) && FIFOstatus & MCP251XFD_RX_FIFO_NOT_EMPTY) {
+            while (FIFOstatus & MCP251XFD_RX_FIFO_NOT_EMPTY) {
                 ESP_LOGI(TAG, "CAN Driver Receive Task: Got a message!!");
                 // Begin loop for reading a single message out of this chip's queue
                 CANMessage_t receivedMessage;
@@ -87,6 +93,7 @@ static void CANDriverTask(void *arg) {
                 // set the payload of the MCP251XFD struct to our CANMessage struct to avoid a memcpy
                 tempMessage.PayloadData = &receivedMessage.payload[0];
                 if (chip_get_message(dev, &tempMessage) != ERR_OK) {
+                    ESP_LOGE(TAG, "Error reading message %d", tempMessage.MessageID);
                     ++commErrorCount;
                 }
                 receivedMessage.bus = busSelect;
@@ -95,16 +102,18 @@ static void CANDriverTask(void *arg) {
                 receivedMessage.ID = tempMessage.MessageID;
                 receivedMessage.SEQ = tempMessage.MessageSEQ;
                 receivedMessage.timestamp = esp_timer_get_time();
-                // if (FIFOstatus & MCP251XFD_RX_FIFO_OVERFLOW) {
-                //     ++commBufferErrorCount;
-                //     MCP251863ClearFIFOOverflowFlag(&dev->mcp251863, MCP251XFD_FIFO1);
-                // }
+                if (FIFOstatus & MCP251XFD_RX_FIFO_OVERFLOW) {
+                    ++commBufferErrorCount;
+                    MCP251863ClearFIFOOverflowFlag(&dev->mcp251863, MCP251XFD_FIFO1);
+                }
                 if (xQueueSend(driver.messageBuffer, &receivedMessage, pdMS_TO_TICKS(10)) == pdTRUE) {
                     ++messageCount;
                 }
                 else {
                     ++rtosQueueFullCount;
                 }
+                chip_check_fifo(dev, &FIFOstatus);
+                ESP_LOGI(TAG, "Status: %d", FIFOstatus);
             }
             // Attempt to update buffer counts after we have read all messages
             xSemaphoreTake(dev->statsMutex, portMAX_DELAY);
@@ -117,6 +126,8 @@ static void CANDriverTask(void *arg) {
         }
 
         ESP_LOGI(TAG, "End of recieve task iteration");
+            }
+
     }
 
 
@@ -230,10 +241,7 @@ int addCANBus(uint8_t bus, int csPin, int interruptPin, int standbyPin) {
     if(ret){
         ShowDeviceError(ret);
     }
-    
-    // Unmask event
-    driver.deviceEventMask |= (0x1 << bus);
-    //xEventGroupSetBits(driver.messageEvents, 1 << bus);
+
 
     return ret;
 }
@@ -300,4 +308,8 @@ void printCANDriverState() {
                busStats.receiveBufferFullCount, busStats.communicationErrorCount ? LOG_ANSI_COLOR_BOLD(LOG_ANSI_COLOR_RED) : "",
                busStats.communicationErrorCount);
     }
+}
+
+void enableCANDriver() {
+    enabled = true;
 }
