@@ -11,6 +11,8 @@
 #include <esp_timer.h>
 #include <esp_log.h>
 
+#include "esp_sleep.h"
+
 // #include "GUB2.h"
 
 static const char *TAG = "CANLogger";
@@ -131,6 +133,14 @@ int canLoggerUpdate(){
 int canLoggerProcessMessage(CANMessage_t const *msg){
     if(fileStatus.CANFile == NULL) return LOGGER_ERR_NOT_OPEN;
     if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return LOGGER_ERR_SEMAPHORE_TIMEOUT;
+    if (msg->ID == 0x0FF) {
+        // RIP GUB :(
+        canLoggerFlushFile();
+        canLoggerCloseFile();
+        ESP_LOGI(TAG, "GUB STOPPED!", msg->ID);
+        esp_deep_sleep_start();
+        return LOGGER_ERR_OK;
+    }
 
     fprintf(fileStatus.CANFile, "%lld,%u,%lx,%lu,%u,",
         msg->timestamp,
