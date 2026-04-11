@@ -57,7 +57,7 @@ void GUBInit(){
     esp_ipc_call_blocking(1, installGPIOISRService, 0);
     gpio_install_isr_service(0);
     
-    ESP_LOGD(TAG, "Starting CAN.");
+    ESP_LOGI(TAG, "Starting CAN.");
     // CAN bus driver setup. Don't want to miss anything so do this first!
     setupCANDriver(gubState.gubEvents, CAN_EVENT);
 
@@ -68,6 +68,7 @@ void GUBInit(){
     addCANBus(1, PIN_NUM_CAN_A_CS, PIN_NUM_CAN_A_RX_INT, PIN_NUM_CAN_A_STB);
     addCANBus(0, PIN_NUM_CAN_MC_CS, PIN_NUM_CAN_MC_RX_INT, PIN_NUM_CAN_MC_STB);
     addCANBus(1, PIN_NUM_CAN_A_CS, PIN_NUM_CAN_A_RX_INT, PIN_NUM_CAN_A_STB);
+    addCANBus(0, PIN_NUM_CAN_MC_CS, PIN_NUM_CAN_MC_RX_INT, PIN_NUM_CAN_MC_STB);
 
     
     #ifdef SD_USING_SDIO
@@ -112,6 +113,7 @@ void GUBInit(){
     GUBInitLED();
 
     ESP_LOGI(TAG, "GUB Setup, starting main loop");
+    enableCANDriver();
     xTaskCreate( GUBloop, "GUB", GUB_STACK_SIZE, NULL, 2, &gubState.mainTaskHandler);
 }
 

@@ -99,11 +99,10 @@ typedef struct {
 typedef struct {
     CANDevice_t devices[CAN_BUS_COUNT]; // Device states
     QueueHandle_t messageBuffer;        // Combined messageBuffer
-    EventGroupHandle_t messageEvents;   // Event handler for interrupts to trigger receive task
+    QueueHandle_t messageEvents;   // Queue to indicate which chips have triggered the interrupt
     EventGroupHandle_t globalEvents;    // Global GUB events to signal new messages are available;
     TaskHandle_t driverTaskHandler;
     uint16_t messageFlag;
-    uint8_t deviceEventMask;
 } CANDriver_t;
 
 //Main driver setup methods
@@ -119,5 +118,7 @@ void canDriverUpdate();
 // debugging methods
 void printCANMessage(CANMessage_t const *msg);
 void printCANDriverState();
+
+void enableCANDriver();
 
 #endif
