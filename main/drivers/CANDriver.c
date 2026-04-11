@@ -69,57 +69,55 @@ static void CANDriverTask(void *arg) {
         commBufferErrorCount = 0;
         rtosQueueFullCount = 0;
         if (xQueueReceive(driver.messageEvents, &busSelect, portMAX_DELAY) == pdTRUE) {
-            for (int i = 0; i < CAN_BUS_COUNT; i++) {
-                // If GUB2 has not enabled the CANDriver yet (filesystem queues may not be ready), ignore this message
-                if (!enabled) { continue; }
+            // If GUB2 has not enabled the CANDriver yet (filesystem queues may not be ready), ignore this message
+            if (!enabled) { continue; }
 
-                ESP_LOGI(TAG, "CAN Driver Receive Task started: busSelect: %d", i);
-                // There is a new CAN message on the chip indicated by busSelect
-                // Loop over this chip's FIFO until there are no new messages
-                eMCP251XFD_FIFOstatus FIFOstatus = 0;
-                CANDevice_t *dev = &driver.devices[i];
+            ESP_LOGI(TAG, "CAN Driver Receive Task started: busSelect: %d", busSelect);
+            // There is a new CAN message on the chip indicated by busSelect
+            // Loop over this chip's FIFO until there are no new messages
+            eMCP251XFD_FIFOstatus FIFOstatus = 0;
+            CANDevice_t *dev = &driver.devices[busSelect];
+            chip_check_fifo(dev, &FIFOstatus);
+            ESP_LOGI(TAG, "Status: %d", FIFOstatus);
+            while (FIFOstatus & MCP251XFD_RX_FIFO_NOT_EMPTY) {
+                ESP_LOGI(TAG, "CAN Driver Receive Task: Got a message!!");
+                // Begin loop for reading a single message out of this chip's queue
+                CANMessage_t receivedMessage;
+                MCP251XFD_CANMessage tempMessage;
+                // set the payload of the MCP251XFD struct to our CANMessage struct to avoid a memcpy
+                tempMessage.PayloadData = &receivedMessage.payload[0];
+                if (chip_get_message(dev, &tempMessage) != ERR_OK) {
+                    ESP_LOGE(TAG, "Error reading message %d", tempMessage.MessageID);
+                    ++commErrorCount;
+                }
+                receivedMessage.bus = busSelect;
+                receivedMessage.DLC =
+                        MCP251XFD_DLCToByte(tempMessage.DLC, tempMessage.ControlFlags & MCP251XFD_CANFD_FRAME);
+                receivedMessage.ID = tempMessage.MessageID;
+                receivedMessage.SEQ = tempMessage.MessageSEQ;
+                receivedMessage.timestamp = esp_timer_get_time();
+                if (FIFOstatus & MCP251XFD_RX_FIFO_OVERFLOW) {
+                    ++commBufferErrorCount;
+                    MCP251863ClearFIFOOverflowFlag(&dev->mcp251863, MCP251XFD_FIFO1);
+                }
+                if (xQueueSend(driver.messageBuffer, &receivedMessage, pdMS_TO_TICKS(10)) == pdTRUE) {
+                    ++messageCount;
+                } else {
+                    ++rtosQueueFullCount;
+                }
                 chip_check_fifo(dev, &FIFOstatus);
                 ESP_LOGI(TAG, "Status: %d", FIFOstatus);
-                while (FIFOstatus & MCP251XFD_RX_FIFO_NOT_EMPTY) {
-                    ESP_LOGI(TAG, "CAN Driver Receive Task: Got a message!!");
-                    // Begin loop for reading a single message out of this chip's queue
-                    CANMessage_t receivedMessage;
-                    MCP251XFD_CANMessage tempMessage;
-                    // set the payload of the MCP251XFD struct to our CANMessage struct to avoid a memcpy
-                    tempMessage.PayloadData = &receivedMessage.payload[0];
-                    if (chip_get_message(dev, &tempMessage) != ERR_OK) {
-                        ESP_LOGE(TAG, "Error reading message %d", tempMessage.MessageID);
-                        ++commErrorCount;
-                    }
-                    receivedMessage.bus = busSelect;
-                    receivedMessage.DLC =
-                            MCP251XFD_DLCToByte(tempMessage.DLC, tempMessage.ControlFlags & MCP251XFD_CANFD_FRAME);
-                    receivedMessage.ID = tempMessage.MessageID;
-                    receivedMessage.SEQ = tempMessage.MessageSEQ;
-                    receivedMessage.timestamp = esp_timer_get_time();
-                    if (FIFOstatus & MCP251XFD_RX_FIFO_OVERFLOW) {
-                        ++commBufferErrorCount;
-                        MCP251863ClearFIFOOverflowFlag(&dev->mcp251863, MCP251XFD_FIFO1);
-                    }
-                    if (xQueueSend(driver.messageBuffer, &receivedMessage, pdMS_TO_TICKS(10)) == pdTRUE) {
-                        ++messageCount;
-                    } else {
-                        ++rtosQueueFullCount;
-                    }
-                    chip_check_fifo(dev, &FIFOstatus);
-                    ESP_LOGI(TAG, "Status: %d", FIFOstatus);
-                }
-                // Attempt to update buffer counts after we have read all messages
-                xSemaphoreTake(dev->statsMutex, portMAX_DELAY);
-                dev->stats.communicationErrorCount += commErrorCount;
-                dev->stats.fifoErrorCount += commBufferErrorCount;
-                dev->stats.receiveBufferFullCount += rtosQueueFullCount;
-                dev->stats.messageReceiveCount += messageCount;
-                xSemaphoreGive(dev->statsMutex);
             }
-
-            ESP_LOGI(TAG, "End of recieve task iteration");
+            // Attempt to update buffer counts after we have read all messages
+            xSemaphoreTake(dev->statsMutex, portMAX_DELAY);
+            dev->stats.communicationErrorCount += commErrorCount;
+            dev->stats.fifoErrorCount += commBufferErrorCount;
+            dev->stats.receiveBufferFullCount += rtosQueueFullCount;
+            dev->stats.messageReceiveCount += messageCount;
+            xSemaphoreGive(dev->statsMutex);
         }
+
+        ESP_LOGI(TAG, "End of recieve task iteration");
     }
 }
 
