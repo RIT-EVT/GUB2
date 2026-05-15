@@ -17,6 +17,8 @@
 
 static const char *TAG = "MAIN";
 
+#define RUNTIME_DEBUG
+
 MCP251XFD_BitTimeStats MCP251863_BTStats;
 uint32_t MCP251863_SYSCLK1;
 

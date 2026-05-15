@@ -11,7 +11,7 @@
 
 using namespace mdf;
 
-struct mdf_logger {
+struct  mdf_logger {
     MdfWriter*       writer = nullptr;
     IDataGroup*      dg     = nullptr;
     IChannelGroup*   cg     = nullptr;
@@ -24,38 +24,37 @@ static uint64_t now_ns() {
     return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
 }
 
-extern "C" mdf_logger_err_t mdf_logger_open(const char* path, int can_fd, int compress,
-                                            mdf_logger_handle_t* out) {
+extern "C" mdf_logger_err_t mdf_logger_open(const char* path, int can_fd, int compress, mdf_logger_handle_t* out) {
     if (!path || !out) return MDF_LOGGER_EINVAL;
 
-    auto h = new mdf_logger();
-    h->writer = MdfFactory::CreateMdfWriterEx(MdfWriterType::MdfBusLogger);
-    if (!h->writer) { delete h; return MDF_LOGGER_EINIT; }
+    auto* logger = new mdf_logger();
+    logger->writer = MdfFactory::CreateMdfWriterEx(MdfWriterType::MdfBusLogger);
+    if (!logger->writer) { delete logger; return MDF_LOGGER_EINIT; }
 
-    h->writer->BusType(MdfBusType::CAN);
-    h->writer->StorageType(can_fd ? MdfStorageType::MlsdStorage   // CAN FD typical
+    logger->writer->BusType(MdfBusType::CAN);
+    logger->writer->StorageType(can_fd ? MdfStorageType::MlsdStorage
                                   : MdfStorageType::FixedLengthStorage);
-    h->writer->MaxLength(can_fd ? 64 : 8);
-    h->writer->CompressData(compress != 0);
+    logger->writer->MaxLength(can_fd ? 64 : 8);
+    logger->writer->CompressData(compress != 0);
 
-    if (!h->writer->Init(path)) { delete h->writer; delete h; return MDF_LOGGER_EIO; }
-    if (!h->writer->CreateBusLogConfiguration()) { delete h->writer; delete h; return MDF_LOGGER_EINIT; }
+    if (!logger->writer->Init(path)) { delete logger->writer; delete logger; return MDF_LOGGER_EIO; }
+    if (!logger->writer->CreateBusLogConfiguration()) { delete logger->writer; delete logger; return MDF_LOGGER_EINIT; }
 
     // Locate the CAN_DataFrame group created by the convenience call
-    MdfFile* file = h->writer->GetFile();
+    MdfFile* file = logger->writer->GetFile();
     DataGroupList dgs;
     file->DataGroups(dgs);
-    if (dgs.empty()) { delete h->writer; delete h; return MDF_LOGGER_EINIT; }
-    h->dg = dgs.back();
-    h->cg = h->dg->GetChannelGroup("CAN_DataFrame");
-    if (!h->cg) { delete h->writer; delete h; return MDF_LOGGER_EINIT; }
+    if (dgs.empty()) { delete logger->writer; delete logger; return MDF_LOGGER_EINIT; }
+    logger->dg = dgs.back();
+    logger->cg = logger->dg->GetChannelGroup("CAN_DataFrame");
+    if (!logger->cg) { delete logger->writer; delete logger; return MDF_LOGGER_EINIT; }
 
     // Start the measurement and internal queue writer thread
-    (void)h->writer->InitMeasurement();
-    h->writer->StartMeasurement(now_ns());
-    h->started = true;
+    (void)logger->writer->InitMeasurement();
+    logger->writer->StartMeasurement(now_ns());
+    logger->started = true;
 
-    *out = h;
+    *out = logger;
     return MDF_LOGGER_OK;
 }
 
@@ -73,7 +72,7 @@ extern "C" mdf_logger_err_t mdf_logger_write(mdf_logger_handle_t h,
     msg.Dir(f->is_tx != 0);
 
     size_t len = f->is_fd ? CanMessage::DlcToLength(f->dlc) : f->dlc;
-    if (len > sizeof(f->data)) len = sizeof(f->data);
+    //if (len > sizeof(f->data)) len = sizeof(f->data);
     std::vector<uint8_t> bytes(f->data, f->data + len);
     msg.DataBytes(bytes); // sets DLC appropriately for CAN/CAN-FD
 

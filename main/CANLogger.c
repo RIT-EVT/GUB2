@@ -64,13 +64,7 @@ int createBaseLogName(){
  * Write the csv file header to the first file
 */
 int writeLogHeader(){
-    if(fileStatus.CANFile == NULL) return LOGGER_ERR_NOT_OPEN;
-    if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return LOGGER_ERR_SEMAPHORE_TIMEOUT;
-
-    fprintf(fileStatus.CANFile, "TS,BUS,ID,SEQ,DLC,DATAn\r\n");
-    fileStatus.headerWriten = true;
-
-    xSemaphoreGive(fileStatus.fileMutex);
+    /* No Longer Used */
     return LOGGER_ERR_OK;
 }
 
@@ -79,7 +73,6 @@ int writeLogHeader(){
 */
 int canLoggerInit(){
     fileStatus.fileMutex = xSemaphoreCreateMutex();
-    fileStatus.splitNumber = 0;
     fileStatus.duplicateNumber = 0;
     fileStatus.filePath = &absPath[0];
 
@@ -101,29 +94,31 @@ int canLoggerInit(){
  * Process periodic logging tasks
 */
 int canLoggerUpdate(){
-    if(fileStatus.CANFile == NULL){
-        if(fileStatus.baseName == NULL){
-            createBaseLogName();
-        } else {
-            canLoggerOpenFile(false);
-        }
-    }
-
-    if(!fileStatus.headerWriten)
-        writeLogHeader();
-
-    if(fileStatus.totalBytesWritten > MAX_LOG_SIZE){
-        canLoggerCloseFile();
-        fileStatus.splitNumber++;
-        canLoggerOpenFile(false);
-    }
-
-    if(fileStatus.totalBytesWritten - fileStatus.bytesWrittenAtFlush > FLUSH_SIZE_THRESHOLD || 
-            esp_timer_get_time() - fileStatus.lastFlushTime > FLUSH_LOG_INTERVAL){
-        canLoggerFlushFile();
-    }
-
-    return fileStatus.CANFile != NULL;
+    // Eh??
+    // if(fileStatus.CANFile == NULL){
+    //     if(fileStatus.baseName == NULL){
+    //         createBaseLogName();
+    //     } else {
+    //         canLoggerOpenFile(false);
+    //     }
+    // }
+    //
+    // if(!fileStatus.headerWriten)
+    //     writeLogHeader();
+    //
+    // if(fileStatus.totalBytesWritten > MAX_LOG_SIZE){
+    //     canLoggerCloseFile();
+    //     fileStatus.splitNumber++;
+    //     canLoggerOpenFile(false);
+    // }
+    //
+    // if(fileStatus.totalBytesWritten - fileStatus.bytesWrittenAtFlush > FLUSH_SIZE_THRESHOLD ||
+    //         esp_timer_get_time() - fileStatus.lastFlushTime > FLUSH_LOG_INTERVAL){
+    //     canLoggerFlushFile();
+    // }
+    //
+    // return fileStatus.CANFile != NULL;
+    return 0;
 }
 
 /**
@@ -142,21 +137,16 @@ int canLoggerProcessMessage(CANMessage_t const *msg){
         return LOGGER_ERR_OK;
     }
 
-    fprintf(fileStatus.CANFile, "%lld,%u,%lx,%lu,%u,",
-        msg->timestamp,
-        msg->bus,
-        msg->ID,
-        msg->SEQ,
-        msg->DLC
-    );
+    // Allocate this frame
+    mdf_can_frame_t* canFrame = calloc(1, sizeof(mdf_can_frame_t));
+    // printf("%08lX\n", *((uint32_t*)(msg->payload)));
+    memcpy(&canFrame->data[0], &msg->payload[0], 8);
+    canFrame->id = msg->ID;
+    canFrame->dlc = msg->DLC;
 
-    for(int i=0; i<msg->DLC; i++){
-        fprintf(fileStatus.CANFile,"%x,", msg->payload[i]);
-    }
+    mdf_logger_write(fileStatus.CANFile, canFrame, 0);
 
-    fprintf(fileStatus.CANFile,"\r\n");
-
-    fileStatus.totalBytesWritten = ftell(fileStatus.CANFile);
+    free(canFrame);
 
     xSemaphoreGive(fileStatus.fileMutex);
     return LOGGER_ERR_OK;
@@ -174,24 +164,29 @@ int canLoggerOpenFile(bool append){
     }
 
     if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return LOGGER_ERR_SEMAPHORE_TIMEOUT;
-    snprintf(fileStatus.filePath, 100, "%s/%s-%d.csv", SD_CARD_CAN_LOG_PATH, fileStatus.baseName, fileStatus.splitNumber);
+    snprintf(fileStatus.filePath, 100, "%s/%s-%d.mf4", SD_CARD_CAN_LOG_PATH, fileStatus.baseName, fileStatus.duplicateNumber);
 
-    if(append){
-        fileStatus.CANFile = fopen(fileStatus.filePath, "a");
-    } else {
-        fileStatus.CANFile = fopen(fileStatus.filePath, "w");
+    ESP_LOGI(TAG, "filename: %s", fileStatus.filePath);
+    int status = mdf_logger_open(fileStatus.filePath, 0, 0, &fileStatus.CANFile);
+
+    if (status == LOGGER_ERR_OK && fileStatus.CANFile != NULL) {
+        ESP_LOGI(TAG, "File opened successfully");
     }
-
-    if(fileStatus.CANFile) {
-        //get file size
-        fseek(fileStatus.CANFile, 0L, SEEK_END);
-        fileStatus.totalBytesWritten = ftell(fileStatus.CANFile);
-        fseek(fileStatus.CANFile, 0, SEEK_SET);
-
-        //reset stats
-        fileStatus.bytesWrittenAtFlush = fileStatus.totalBytesWritten;
-        fileStatus.lastFlushTime = esp_timer_get_time();
+    else {
+        xSemaphoreGive(fileStatus.fileMutex);
+        ESP_LOGE(TAG, "Error opening CAN log file %d", status);
+        return status;
     }
+    // if(fileStatus.CANFile) {
+    //     //get file size
+    //     fseek(fileStatus.CANFile, 0L, SEEK_END);
+    //     fileStatus.totalBytesWritten = ftell(fileStatus.CANFile);
+    //     fseek(fileStatus.CANFile, 0, SEEK_SET);
+    //
+    //     //reset stats
+    //     fileStatus.bytesWrittenAtFlush = fileStatus.totalBytesWritten;
+    //     fileStatus.lastFlushTime = esp_timer_get_time();
+    // }
 
     xSemaphoreGive(fileStatus.fileMutex);
     return LOGGER_ERR_OK;
@@ -201,17 +196,18 @@ int canLoggerOpenFile(bool append){
  * Flush the internal buffers to the file.
 */
 int canLoggerFlushFile(){
-    if(fileStatus.CANFile == NULL) return LOGGER_ERR_NOT_OPEN;
-    if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return LOGGER_ERR_SEMAPHORE_TIMEOUT;
-    
-    // Force file writing, both sync and flush are necessary to force buffers to disk.
-    fflush(fileStatus.CANFile);
-    fsync(fileno(fileStatus.CANFile));
-    fileStatus.lastFlushTime = esp_timer_get_time();
-    fileStatus.bytesWrittenAtFlush = fileStatus.totalBytesWritten;
-
-    xSemaphoreGive(fileStatus.fileMutex);
-    return LOGGER_ERR_OK;
+    return mdf_logger_flush(fileStatus.CANFile);
+    // if(fileStatus.CANFile == NULL) return LOGGER_ERR_NOT_OPEN;
+    // if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return LOGGER_ERR_SEMAPHORE_TIMEOUT;
+    //
+    // // Force file writing, both sync and flush are necessary to force buffers to disk.
+    // fflush(fileStatus.CANFile);
+    // fsync(fileno(fileStatus.CANFile));
+    // fileStatus.lastFlushTime = esp_timer_get_time();
+    // fileStatus.bytesWrittenAtFlush = fileStatus.totalBytesWritten;
+    //
+    // xSemaphoreGive(fileStatus.fileMutex);
+    // return LOGGER_ERR_OK;
 }
 
 /**
@@ -221,7 +217,8 @@ int canLoggerCloseFile(){
     if(!xSemaphoreTake(fileStatus.fileMutex, pdMS_TO_TICKS(5))) return LOGGER_ERR_NOT_OPEN;
 
     if(fileStatus.CANFile != NULL){
-        fclose(fileStatus.CANFile);
+        mdf_logger_flush(fileStatus.CANFile);
+        mdf_logger_close(fileStatus.CANFile);
     }
 
     fileStatus.CANFile = NULL;

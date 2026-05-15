@@ -33,7 +33,7 @@ extern "C" {
     mdf_logger_err_t mdf_logger_write(mdf_logger_handle_t h,
                                       const mdf_can_frame_t* frame,
                                       uint64_t timestamp_ns);
-    mdf_logger_err_t mdf_logger_flush(mdf_logger_handle_t h); // optional
+    mdf_logger_err_t mdf_logger_flush(mdf_logger_handle_t h);
     mdf_logger_err_t mdf_logger_close(mdf_logger_handle_t h);
 
 #ifdef __cplusplus

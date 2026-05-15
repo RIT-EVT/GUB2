@@ -82,7 +82,6 @@ void WriteCache::Init() {
   // Start the working thread that handles the samples
   writer_.State(WriteState::Init);  // Waits for new samples
   work_thread_ = std::thread(&WriteCache::WorkThread, this);
-
 }
 
 void WriteCache::Exit() {

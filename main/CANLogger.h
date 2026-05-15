@@ -8,22 +8,23 @@
 #include <freertos/semphr.h>
 
 #include "GUB_Conf.h"
+#include "mdf_shim.h"
 #include "drivers/CANDriver.h"
 
 struct CANFileStatus {
-    FILE *CANFile;
+    mdf_logger_handle_t CANFile;
     SemaphoreHandle_t fileMutex;
 
     // file name information
     char *baseName;
     char *filePath;
-    int splitNumber;
+    // int splitNumber;
     int duplicateNumber;
 
     // stats for file control
-    uint32_t totalBytesWritten;
-    uint32_t bytesWrittenAtFlush;
-    int64_t lastFlushTime;
+    // uint32_t totalBytesWritten;
+    // uint32_t bytesWrittenAtFlush;
+    // int64_t lastFlushTime;
     bool headerWriten;
 };
 
